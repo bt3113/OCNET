@@ -1,3 +1,4 @@
+import { BuildCard, CollectionPicker } from "../components/builds/cards";
 import { MediaManager } from "../components/media";
 import { useState } from "react";
 import {
@@ -48,7 +49,7 @@ export default function Workspace() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const actions = useActions();
-  const { notify, role } = useUI();
+  const { notify, userId, roles } = useUI();
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<WorkspaceRecord | null>(null);
   const [tab, setTab] = useState("All");
@@ -59,8 +60,10 @@ export default function Workspace() {
     isError,
     refetch,
   } = useRecords("projects");
+  const { data: builds = [] } = useRecords("builds");
   const { data: products = [] } = useRecords("products");
-  const { data: saved = [] } = useRecords("saved_items");
+  const { data: allSaved = [] } = useRecords("saved_items");
+  const saved = allSaved.filter((s) => !s.ownerId || s.ownerId === userId);
   const { data: providers = [] } = useRecords("providers");
   const { data: cases = [] } = useRecords("use_cases");
   const { data: proposals = [] } = useRecords("proposals");
@@ -106,7 +109,7 @@ export default function Workspace() {
   }
   if (isLoading) return <Skeleton />;
   if (isError) return <ErrorState retry={() => void refetch()} />;
-  if (isSupabase && area === "admin" && role !== "admin")
+  if (isSupabase && area === "admin" && !roles.includes("admin"))
     return (
       <EmptyState
         title="Administrator access required"
@@ -118,7 +121,9 @@ export default function Workspace() {
   if (
     isSupabase &&
     area === "provider" &&
-    !["provider", "integrator", "consultant", "admin"].includes(role)
+    !roles.some((r) =>
+      ["provider", "integrator", "consultant", "admin"].includes(r),
+    )
   )
     return (
       <EmptyState
@@ -373,7 +378,7 @@ export default function Workspace() {
                         id: crypto.randomUUID(),
                         name: "Message",
                         threadId: current.id,
-                        senderId: "demo-user",
+                        senderId: userId,
                         body,
                         sentAt: new Date().toISOString(),
                         provenance: "demo",
@@ -580,6 +585,26 @@ export default function Workspace() {
         </>
       ) : section === "saved" ? (
         <>
+          <ButtonLink to="/collections" variant="light">
+            Manage private collections
+          </ButtonLink>
+          <div className="build-grid">
+            {builds
+              .filter((b) => saved.some((s) => s.entityId === b.id))
+              .map((b) => (
+                <BuildCard key={b.id} build={b} />
+              ))}
+          </div>
+          {saved.map((s) => (
+            <div className="collection-shortcut" key={s.id}>
+              <span>{s.name}</span>
+              <CollectionPicker
+                entityId={s.entityId}
+                entityType={s.entityType}
+                name={s.name}
+              />
+            </div>
+          ))}
           {saved.length ? (
             <>
               <div className="grid three">
@@ -600,7 +625,8 @@ export default function Workspace() {
                 .filter(
                   (s) =>
                     !products.some((p) => p.id === s.entityId) &&
-                    !providers.some((p) => p.id === s.entityId),
+                    !providers.some((p) => p.id === s.entityId) &&
+                    !builds.some((b) => b.id === s.entityId),
                 )
                 .map((s) => (
                   <div className="card saved-row" key={s.id}>

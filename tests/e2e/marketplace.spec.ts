@@ -6,11 +6,14 @@ import {
   providerRoutes,
   adminRoutes,
   authRoutes,
+  creatorRoutes,
+  buildAdminRoutes,
+  buildProviderRoutes,
 } from "../../src/routes";
 test("all requested routes and entity details render meaningful content", async ({
   page,
 }) => {
-  test.setTimeout(120000);
+  test.setTimeout(180000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const paths = [
@@ -19,6 +22,11 @@ test("all requested routes and entity details render meaningful content", async 
     ...providerRoutes,
     ...adminRoutes,
     ...authRoutes,
+    ...creatorRoutes,
+    ...buildAdminRoutes,
+    ...buildProviderRoutes,
+    "/builds/ai-dental-receptionist",
+    "/creators/alex-chen",
     "/use-cases/product-video-website",
     "/solution-stacks/product-video-website-stack",
     "/technologies/runway-video",
@@ -155,6 +163,9 @@ for (const width of [1440, 1280, 1024, 768, 430, 390, 360])
     for (const path of [
       "/",
       "/technologies",
+      "/builds",
+      "/builds/ai-dental-receptionist",
+      "/creator/builds/new",
       "/use-cases/product-video-website",
       "/app/projects/new",
       "/provider/listings",
@@ -169,6 +180,7 @@ for (const width of [1440, 1280, 1024, 768, 430, 390, 360])
       ).toBe(true);
     }
     await page.goto("/OCNET/");
+    await expect(page.locator("main h1")).toBeVisible();
     await page.screenshot({ path: `qa/home-${width}.png`, fullPage: true });
   });
 for (const path of [
@@ -176,6 +188,10 @@ for (const path of [
   "/technologies",
   "/app/projects/new",
   "/sign-in",
+  "/builds",
+  "/builds/ai-dental-receptionist",
+  "/creator/builds/new",
+  "/creators/alex-chen",
   "/app/messages",
 ])
   test(`accessibility ${path}`, async ({ page }) => {

@@ -22,3 +22,9 @@ Vite base and BrowserRouter basename are `/OCNET/`. `scripts/postbuild.mjs` gene
 ## Production host
 
 Use a host with request headers, server functions, route rewrites, structured observability, and server-rendered entity metadata. Add a strict CSP compatible with required media, secure cookies/session policy, signed storage, spam prevention, delivery services, backups, retention, and performance monitoring. Never add live payments or sensitive financial collection to the Pages prototype.
+
+## Build release
+
+Apply both `202609240001_build_graph.sql` and `202609240002_search.sql` after the original migration. Ensure pgvector is installed in the public schema expected by the search migration. Re-run `seed.sql`; use optional `seed-builds.sql` with explicitly selected staging Auth UUIDs. Deploy `import-public` with server-side environment configuration described in [Build marketplace](build-marketplace.md). Enable GitHub in Supabase Auth and configure the Supabase callback in the GitHub OAuth application; allow the deployed `/creator` redirect.
+
+Pages always builds demo mode. No Supabase credential, GitHub token, embedding key or gateway secret is required for this deployment. New seeded Build/creator URLs receive static metadata; dynamically published demo records exist only in that browser and use the SPA fallback.

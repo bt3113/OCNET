@@ -21,3 +21,11 @@ The model follows business outcome → use case → required capability → solu
 Provenance: verified, vendor supplied, third-party sourced, community supplied, demo, unverified. Published visibility and verification are distinct. No provenance state implies a numerical rating. The frontend uses stable text IDs and slugs; SQL adds generated relational columns for referential integrity.
 
 `src/data/model.ts` is the TypeScript source. `src/data/seed.ts` is the demo catalogue. `scripts/export-seed.mjs` generates public SQL seeds; private demo workspace records are intentionally not seeded to a live database with fake Auth users. `supabase/migrations` owns DB constraints and policies.
+
+## Relational Build graph
+
+`creator_profiles` owns identity presentation. `builds` references an Auth owner, creator, optional organization, category and optional parent Build. `build_stack_items` references products/capabilities; `build_connections` has composite foreign keys enforcing both nodes belong to the same Build. `build_use_cases`, `build_capabilities`, `build_sources` and `build_media` complete the aggregate. Read DTO arrays are assembled by SQL; writes replace child sets atomically.
+
+`build_offers`, `build_comments`, `build_updates`, `build_forks`, `creator_follows`, `collections`, `collection_items`, `build_comparisons` and `marketplace_events` model interaction. `user_roles`, `organization_memberships` and `build_collaborators` define trusted authorization. `reports`, `provider_claims` and immutable `audit_events` support review. `import_budgets` is a server-managed rate-limit counter. `search_embeddings` is server-only, with no browser RLS policies. Each exposed new table has RLS enabled.
+
+A Build is never stored in `projects`: that existing entity is a procurement brief. It can reference `sourceBuildId` and `sourceStackProductIds` without copying ownership. Provenance, publication, moderation, verification, visibility, source availability and reuse permission are separate states.

@@ -9,3 +9,9 @@ Desktop navigation is 236px wide (214px on small desktop, 255px wide desktop). A
 Shared primitives: ButtonLink, cards, badges, logos, breadcrumbs, tabs, pagination, skeletons, empty/error states, accessible Radix dialogs, search palette, comparison tray, galleries, table, contact modal, project wizard, stack visualizer, notifications, and messaging. Restrained hover lift, dialog transitions, and tray motion respect reduced-motion settings.
 
 Artwork is original SVG illustration, not vendor screenshots. Demo logos use lettermarks. Evidence labels are part of the interface, not decorative claims.
+
+## Build surfaces
+
+Build cards add original warm UI concept covers, outcome-first titles, creator bylines and linked technology chips. Featured cards use a wider composition; discovery cards retain the ivory surface and thin border. The homepage preserves the fixed sidebar, strong search, warm sand palette and right-hand discovery rail. Creator profiles use restrained initial avatars; no invented review stars appear.
+
+The architecture explorer uses a bounded scroll/pan canvas on desktop and an ordered list on mobile. Node detail cards expose role, evidence and alternatives. The publisher uses a compact step rail that wraps on smaller screens. Collections, offers and moderation reuse shared dialogs, buttons, tables and empty/error states. Reduced motion applies across both releases. New SVG previews are original illustrative UI, not screenshots of vendor products.

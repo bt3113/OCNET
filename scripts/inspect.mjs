@@ -25,6 +25,10 @@ for (const path of [
   "/technologies",
   "/app/projects/new",
   "/sign-in",
+  "/builds",
+  "/builds/ai-dental-receptionist",
+  "/creator/builds/new",
+  "/creators/alex-chen",
   "/app/messages",
 ]) {
   await page.goto("http://127.0.0.1:5173/OCNET" + path);
@@ -65,6 +69,21 @@ for (const width of [1440, 1280, 1024, 768, 430, 390, 360]) {
       ),
     }),
   );
+}
+for (const [label, path] of [
+  ["build", "/builds/ai-dental-receptionist"],
+  ["graph", "/builds/ai-dental-receptionist?tab=Stack+%26+architecture"],
+  ["discovery", "/builds"],
+  ["publish", "/creator/builds/new"],
+  ["creator", "/creators/alex-chen"],
+]) {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto("http://127.0.0.1:5173/OCNET" + path);
+    await page.waitForSelector("h1");
+    if (label === "graph") await page.waitForSelector(".architecture-shell");
+    await page.screenshot({ path: `qa/${label}-${width}.png`, fullPage: true });
+  }
 }
 console.log({ errors });
 await browser.close();

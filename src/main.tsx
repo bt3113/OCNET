@@ -6,8 +6,22 @@ import { MotionConfig } from "motion/react";
 import { UIProvider } from "./state";
 import { Layout } from "./components/layout";
 import { Skeleton, EmptyState } from "./components/ui";
-import { buyerRoutes, providerRoutes, adminRoutes, authRoutes } from "./routes";
+import {
+  buyerRoutes,
+  providerRoutes,
+  adminRoutes,
+  authRoutes,
+  creatorRoutes,
+  buildAdminRoutes,
+  buildProviderRoutes,
+} from "./routes";
 import "./styles.css";
+const BuildDiscovery = lazy(() => import("./pages/BuildDiscovery"));
+const BuildDetail = lazy(() => import("./pages/BuildDetail"));
+const Creators = lazy(() => import("./pages/Creators"));
+const Collections = lazy(() => import("./pages/Collections"));
+const BuildWorkspace = lazy(() => import("./pages/BuildWorkspace"));
+const BuildWizard = lazy(() => import("./pages/BuildWizard"));
 const Home = lazy(() => import("./pages/Home"));
 const Discovery = lazy(() => import("./pages/Discovery"));
 const Details = lazy(() => import("./pages/Details"));
@@ -54,7 +68,7 @@ function SEO() {
       "twitter:title": document.title,
       "twitter:description": description,
       robots:
-        /^\/(app|provider\b|admin|sign-in|sign-up|forgot-password|onboarding)/.test(
+        /^\/(app|creator\b|collections\b|provider\b|admin|sign-in|sign-up|forgot-password|onboarding)/.test(
           path,
         )
           ? "noindex,nofollow"
@@ -158,9 +172,33 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Routes>
                   <Route element={<Layout />}>
                     <Route index element={<Home />} />
+                    {["builds", "explore", "search"].map((p) => (
+                      <Route key={p} path={p} element={<BuildDiscovery />} />
+                    ))}
+                    <Route path="builds/:slug" element={<BuildDetail />} />
+                    <Route path="creators" element={<Creators />} />
+                    <Route path="creators/:slug" element={<Creators />} />
+                    <Route path="collections" element={<Collections />} />
+                    <Route path="collections/:slug" element={<Collections />} />
+                    <Route
+                      path="creator/builds/new"
+                      element={<BuildWizard />}
+                    />
+                    <Route
+                      path="creator/builds/:id/edit"
+                      element={<BuildWizard />}
+                    />
+                    <Route path="creator/messages" element={<Workspace />} />
                     {[
-                      "explore",
-                      "search",
+                      ...creatorRoutes.filter(
+                        (p) => !p.endsWith("/new") && !p.endsWith("/messages"),
+                      ),
+                      ...buildAdminRoutes,
+                      ...buildProviderRoutes,
+                    ].map((p) => (
+                      <Route key={p} path={p} element={<BuildWorkspace />} />
+                    ))}
+                    {[
                       "use-cases",
                       "solution-stacks",
                       "technologies",

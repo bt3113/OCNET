@@ -1,4 +1,5 @@
 import type { Table, Tables } from "./model";
+import { buildProducts, buildProviders } from "./build-seed";
 import { seed } from "./seed";
 export interface Repository {
   list<K extends Table>(table: K): Promise<Tables[K][]>;
@@ -14,7 +15,16 @@ export class DemoRepository implements Repository {
     try {
       const parsed: unknown = JSON.parse(raw);
       if (!Array.isArray(parsed)) throw Error();
-      return parsed as Tables[K][];
+      const additions =
+        table === "products"
+          ? buildProducts
+          : table === "providers"
+            ? buildProviders
+            : [];
+      return [
+        ...parsed,
+        ...additions.filter((x) => !parsed.some((v) => v.id === x.id)),
+      ] as Tables[K][];
     } catch {
       throw new Error(
         "Stored demo data could not be read. Export or reset demo data in Settings.",

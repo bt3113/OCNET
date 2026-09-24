@@ -128,7 +128,13 @@ export default function Auth() {
                 })
                 .then(() => {
                   notify("Your workspace is ready");
-                  navigate(persona === "buyer" ? "/app" : "/provider");
+                  navigate(
+                    persona === "buyer"
+                      ? "/app"
+                      : persona === "creator"
+                        ? "/creator"
+                        : "/provider",
+                  );
                 })
                 .catch(() => {});
             }}
@@ -136,12 +142,18 @@ export default function Auth() {
             <h2>Make Oracnet yours</h2>
             <p>Tell us a little about what brings you here.</p>
             <label>
-              I’m here as a
+              Choose your starting workspace
               <select
                 value={persona}
                 onChange={(e) => setPersona(e.target.value as Role)}
               >
-                {["buyer", "provider", "integrator", "consultant"].map((r) => (
+                {[
+                  "buyer",
+                  "creator",
+                  "provider",
+                  "integrator",
+                  "consultant",
+                ].map((r) => (
                   <option key={r}>{r}</option>
                 ))}
               </select>
@@ -159,7 +171,7 @@ export default function Auth() {
             </label>
             <p className="muted">
               {isSupabase
-                ? "Organization roles require approval before provider access is enabled."
+                ? "You can buy and create with one account. Organization roles require approval before provider access is enabled."
                 : "You can switch demo personas in Settings."}
             </p>
             <button className="button dark">
@@ -188,6 +200,34 @@ export default function Auth() {
                 Demo mode. Use sample credentials; no authentication or email
                 delivery takes place.
               </div>
+            )}
+            {!forgot && (
+              <button
+                type="button"
+                className="button light"
+                onClick={async () => {
+                  if (!isSupabase) {
+                    notify(
+                      "GitHub sign-in requires a configured Supabase GitHub provider. Demo credentials are not requested.",
+                    );
+                    return;
+                  }
+                  const { supabase } = await import("../data/supabase");
+                  const { error } = await supabase.auth.signInWithOAuth({
+                    provider: "github",
+                    options: {
+                      redirectTo:
+                        window.location.origin +
+                        import.meta.env.BASE_URL +
+                        "creator",
+                      scopes: "read:user user:email",
+                    },
+                  });
+                  if (error) notify(error.message);
+                }}
+              >
+                Sign in with GitHub
+              </button>
             )}
             <label>
               Email address

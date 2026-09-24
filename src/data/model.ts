@@ -1,11 +1,15 @@
-export type Role = "buyer" | "provider" | "integrator" | "consultant" | "admin";
+import type { BuildTables } from "./build-model";
+export type Role =
+  "creator" | "buyer" | "provider" | "integrator" | "consultant" | "admin";
 export type Provenance =
   | "verified"
   | "vendor supplied"
   | "third-party sourced"
   | "community supplied"
   | "demo"
-  | "unverified";
+  | "unverified"
+  | "creator supplied"
+  | "inferred";
 export interface RecordBase {
   id: string;
   name: string;
@@ -14,7 +18,8 @@ export interface RecordBase {
 }
 export interface User extends RecordBase {
   email: string;
-  role: Role;
+  role: Role; // legacy active workspace, never an authorization boundary
+  roles?: Role[];
   organizationId?: string;
 }
 export interface Organization extends RecordBase {
@@ -105,6 +110,8 @@ export interface Update extends RecordBase {
 }
 export type Article = Update;
 export interface Project extends RecordBase {
+  sourceBuildId?: string;
+  sourceStackProductIds?: string[];
   description: string;
   category: string;
   budget: string;
@@ -120,6 +127,7 @@ export interface Proposal extends RecordBase {
   status: "submitted" | "shortlisted" | "accepted" | "declined";
 }
 export interface SavedItem extends RecordBase {
+  ownerId?: string;
   entityId: string;
   entityType: string;
 }
@@ -175,7 +183,7 @@ export interface WorkspaceRecord extends RecordBase {
   status?: string;
   [key: string]: unknown;
 }
-export interface Tables {
+export interface Tables extends BuildTables {
   users: User;
   organizations: Organization;
   providers: Provider;
@@ -207,3 +215,5 @@ export interface Tables {
   team: WorkspaceRecord;
 }
 export type Table = keyof Tables;
+
+export type ProcurementProject = Project;
