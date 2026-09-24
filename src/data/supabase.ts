@@ -7,9 +7,53 @@ if (!url || !key)
   throw new Error(
     "Supabase mode needs VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
   );
-export const supabase = createClient(url, key);
+const authStorage = {
+  getItem: (k: string) => sessionStorage.getItem(k),
+  removeItem: (k: string) => sessionStorage.removeItem(k),
+  setItem: (k: string, v: string) => {
+    try {
+      const x = JSON.parse(v);
+      delete x.provider_token;
+      delete x.provider_refresh_token;
+      sessionStorage.setItem(k, JSON.stringify(x));
+    } catch {
+      sessionStorage.setItem(k, v);
+    }
+  },
+};
+export const supabase = createClient(url, key, {
+  auth: { flowType: "pkce", storage: authStorage },
+});
+const normalized = new Set([
+  "creator_profiles",
+  "build_offers",
+  "collections",
+  "collection_items",
+  "build_comments",
+  "build_updates",
+  "creator_follows",
+  "build_forks",
+  "organization_memberships",
+  "user_roles",
+  "reports",
+  "audit_events",
+  "provider_claims",
+  "marketplace_events",
+  "build_comparisons",
+  "build_collaborators",
+]);
 export const repository: Repository = {
   async list<K extends Table>(table: K): Promise<Tables[K][]> {
+    if (table === "builds") {
+      const { data, error } = await supabase.rpc("list_builds");
+      if (error) throw error;
+      return data as Tables[K][];
+    }
+    if (normalized.has(table)) {
+      const { data, error } = await supabase.from(table).select("*");
+      if (error) throw error;
+      return data as Tables[K][];
+    }
     const { data, error } = await supabase.from(table).select("id,data");
     if (error) throw error;
     return (data ?? []).map((r) => ({ ...r.data, id: r.id }) as Tables[K]);
@@ -19,6 +63,22 @@ export const repository: Repository = {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Sign in to save changes.");
+    if (table === "builds") {
+      const { data, error } = await supabase.rpc("save_build", {
+        document: value,
+      });
+      if (error) throw error;
+      return data as Tables[K];
+    }
+    if (normalized.has(table)) {
+      const { data, error } = await supabase
+        .from(table)
+        .upsert(value)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Tables[K];
+    }
     const { data: existing, error: readError } = await supabase
       .from(table)
       .select("id")

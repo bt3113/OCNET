@@ -1,3 +1,4 @@
+import { buildSeed, buildProducts, buildProviders } from "./build-seed.ts";
 import type {
   Category,
   Provider,
@@ -539,7 +540,18 @@ export const articles = [
     provenance: "demo" as const,
   },
 ];
+providers.push(...buildProviders);
+products.push(...buildProducts);
 export const seed: Partial<{ [K in Table]: Tables[K][] }> = {
+  ...buildSeed,
+  organizations: [
+    {
+      id: "northstar",
+      name: "Northstar Studio",
+      description: "Fictional demo organization",
+      provenance: "demo",
+    },
+  ],
   categories,
   providers,
   products,
@@ -549,14 +561,17 @@ export const seed: Partial<{ [K in Table]: Tables[K][] }> = {
   consultants,
   articles,
   updates: articles,
-  capabilities: [...new Set(products.flatMap((p) => p.capabilityIds))].map(
-    (id) => ({
-      id,
-      name: id,
-      description: "Capability: " + id,
-      provenance: "demo",
-    }),
-  ),
+  capabilities: [
+    ...new Set([
+      ...products.flatMap((p) => p.capabilityIds),
+      ...(buildSeed.builds ?? []).flatMap((b) => b.capabilityIds),
+    ]),
+  ].map((id) => ({
+    id,
+    name: id,
+    description: "Capability: " + id,
+    provenance: "demo",
+  })),
   projects: [
     {
       id: "sample-project",

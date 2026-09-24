@@ -1,3 +1,4 @@
+import { useMarketplaceSearch } from "../data/search-hook";
 import { useState, useEffect, lazy, Suspense } from "react";
 import {
   Link,
@@ -33,14 +34,16 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRecords, useUI } from "../state";
-import { Modal, Logo, ButtonLink } from "./ui";
+import { Modal, Logo, ButtonLink, Skeleton } from "./ui";
 const ProviderContactModal = lazy(() =>
   import("./forms").then((m) => ({ default: m.ProviderContactModal })),
 );
 import { isSupabase } from "../data/repository";
 const mainLinks = [
   ["/", "Home", Home],
+  ["/builds", "Builds", LayoutGrid],
   ["/explore", "Explore", Search],
+  ["/creators", "Creators", Users],
   ["/use-cases", "Use Cases", LayoutGrid],
   ["/technologies?category=ai-software", "AI Tools & Models", Cpu],
   ["/technologies?category=robotics-hardware", "Robotics & Hardware", Bot],
@@ -51,12 +54,15 @@ const mainLinks = [
 const buyerLinks = [
   ["/app/messages", "Messages", MessageSquare],
   ["/app/saved", "Saved", Bookmark],
+  ["/collections", "Collections", Folder],
   ["/app/projects", "My Projects", Folder],
   ["/compare", "Compare", Scale],
 ] as const;
 const providerSections = [
   "Overview",
   "Company",
+  "Builds",
+  "Claims",
   "Listings",
   "Leads",
   "Proposals",
@@ -68,8 +74,22 @@ const providerSections = [
   "Billing",
   "Settings",
 ];
+const creatorSections = [
+  "Overview",
+  "Builds",
+  "Offers",
+  "Messages",
+  "Analytics",
+  "Profile",
+  "Settings",
+];
 const adminSections = [
   "Overview",
+  "Builds",
+  "Creators",
+  "Offers",
+  "Reports",
+  "Claims",
   "Users",
   "Providers",
   "Listings",
@@ -84,14 +104,16 @@ const adminSections = [
 ];
 export function AppSidebar({ close }: { close: () => void }) {
   const location = useLocation();
-  const { role } = useUI();
+  const { roles, userName } = useUI();
   const workspace =
     location.pathname.startsWith("/provider") &&
     !location.pathname.startsWith("/providers")
       ? "provider"
-      : location.pathname.startsWith("/admin")
-        ? "admin"
-        : null;
+      : /^\/creator(?:\/|$)/.test(location.pathname)
+        ? "creator"
+        : location.pathname.startsWith("/admin")
+          ? "admin"
+          : null;
   return (
     <>
       <Link to="/" className="brand" onClick={close}>
@@ -105,23 +127,26 @@ export function AppSidebar({ close }: { close: () => void }) {
               ← Back to marketplace
             </Link>
             <p className="nav-caption">{workspace} workspace</p>
-            {(workspace === "provider" ? providerSections : adminSections).map(
-              (s, i) => (
-                <NavLink
-                  end
-                  key={s}
-                  to={
-                    "/" +
-                    workspace +
-                    (i ? "/" + s.toLowerCase().replaceAll(" ", "-") : "")
-                  }
-                  onClick={close}
-                >
-                  <span className="nav-dot" />
-                  {s}
-                </NavLink>
-              ),
-            )}
+            {(workspace === "provider"
+              ? providerSections
+              : workspace === "creator"
+                ? creatorSections
+                : adminSections
+            ).map((s, i) => (
+              <NavLink
+                end
+                key={s}
+                to={
+                  "/" +
+                  workspace +
+                  (i ? "/" + s.toLowerCase().replaceAll(" ", "-") : "")
+                }
+                onClick={close}
+              >
+                <span className="nav-dot" />
+                {s}
+              </NavLink>
+            ))}
           </>
         ) : (
           <>
@@ -158,7 +183,7 @@ export function AppSidebar({ close }: { close: () => void }) {
         <Link to="/app/profile" className="profile-chip" onClick={close}>
           <span className="avatar">AC</span>
           <span>
-            <strong>Alex Chen</strong>
+            <strong>{userName}</strong>
             <small>{isSupabase ? "Your account" : "Demo workspace"}</small>
           </span>
           <ChevronDown size={15} />
@@ -181,8 +206,11 @@ export function AppSidebar({ close }: { close: () => void }) {
           <ArrowRight size={20} />
         </Link>
         <div className="workspace-links">
+          <Link to="/creator">Creator</Link>
           <Link to="/provider">Provider</Link>
-          {(!isSupabase || role === "admin") && <Link to="/admin">Admin</Link>}
+          {(!isSupabase || roles.includes("admin")) && (
+            <Link to="/admin">Admin</Link>
+          )}
           <Link to="/about">About</Link>
         </div>
       </div>
@@ -200,9 +228,9 @@ export function MobileNavigation({ onMenu }: { onMenu: () => void }) {
         <Bookmark size={21} />
         Saved
       </NavLink>
-      <NavLink to="/compare">
-        <Scale size={21} />
-        Compare
+      <NavLink to="/creator/builds/new" className="mobile-publish">
+        <Plus size={21} />
+        Publish
       </NavLink>
       <NavLink to="/app/projects">
         <Folder size={21} />
@@ -220,7 +248,7 @@ export function GlobalSearch() {
   return (
     <button className="global-search" onClick={() => setCommand(true)}>
       <Search size={19} />
-      <span>Search technologies, use cases, providers, or resources…</span>
+      <span>Search builds, technologies, use cases, or creators…</span>
       <kbd>⌘ K</kbd>
     </button>
   );
@@ -229,30 +257,21 @@ export function CommandPalette() {
   const { command, setCommand } = useUI();
   const [q, setQ] = useState("");
   const navigate = useNavigate();
-  const { data: products = [] } = useRecords("products");
-  const { data: cases = [] } = useRecords("use_cases");
-  const { data: providers = [] } = useRecords("providers");
-  const results = [
-    ...cases.map((p) => ({
-      ...p,
-      path: "/use-cases/" + p.slug,
-      type: "Use case",
-    })),
-    ...products.map((p) => ({
-      ...p,
-      path: "/technologies/" + p.slug,
-      type: "Technology",
-    })),
-    ...providers.map((p) => ({
-      ...p,
-      path: "/providers/" + p.slug,
-      type: "Provider",
-    })),
-  ]
-    .filter((x) =>
-      (x.name + " " + x.description).toLowerCase().includes(q.toLowerCase()),
-    )
-    .slice(0, 7);
+  const search = useMarketplaceSearch(q);
+  const [active, setActive] = useState(-1);
+  const results = search.data.slice(0, 7);
+  const jumps = [
+    { name: "Publish a build", path: "/creator/builds/new" },
+    { name: "Your saved items", path: "/app/saved" },
+    { name: "Compare", path: "/compare" },
+    { name: "Creator workspace", path: "/creator" },
+  ];
+  const options = [
+    ...results,
+    ...jumps.filter(
+      (j) => !q || j.name.toLowerCase().includes(q.toLowerCase()),
+    ),
+  ];
   useEffect(() => {
     function key(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -268,14 +287,18 @@ export function CommandPalette() {
       open={command}
       onClose={() => setCommand(false)}
       title="What do you want to build?"
-      description="Search use cases, technologies, and providers. Enter to see all results."
+      description="Search builds, use cases, technologies and creators. Arrow keys choose; Enter opens."
     >
       <form
         className="command-input"
         onSubmit={(e) => {
           e.preventDefault();
           setCommand(false);
-          navigate("/search?q=" + encodeURIComponent(q));
+          navigate(
+            active >= 0 && options[active]
+              ? options[active].path
+              : "/search?q=" + encodeURIComponent(q),
+          );
         }}
       >
         <Search size={20} />
@@ -284,29 +307,68 @@ export function CommandPalette() {
           aria-label="Search marketplace"
           placeholder="Try ‘video’, ‘automation’, or ‘OpenAI’"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setActive(-1);
+          }}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={command}
+          aria-controls="command-results"
+          aria-activedescendant={
+            active >= 0 ? "command-option-" + active : undefined
+          }
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive(
+                (active + (e.key === "ArrowDown" ? 1 : -1) + options.length) %
+                  options.length,
+              );
+            }
+          }}
         />
         <button aria-label="Search all results" className="icon-button">
           <ArrowRight size={20} />
         </button>
       </form>
-      <div className="command-results">
-        {results.map((r) => (
-          <Link key={r.path} to={r.path} onClick={() => setCommand(false)}>
-            <span className="category-icon sand">
-              <Search size={18} />
-            </span>
-            <span>
-              <strong>{r.name}</strong>
-              <small>{r.type} · Demo</small>
-            </span>
-            <ArrowRight size={17} />
-          </Link>
+      <div
+        className="command-results"
+        id="command-results"
+        role="listbox"
+        aria-label="Search suggestions"
+      >
+        {options.map((r, i) => (
+          <div
+            key={r.path}
+            id={"command-option-" + i}
+            role="option"
+            aria-selected={active === i}
+            className={active === i ? "command-active" : ""}
+          >
+            <Link to={r.path} onClick={() => setCommand(false)}>
+              <span className="category-icon sand">
+                <Search size={18} />
+              </span>
+              <span>
+                <strong>{r.name}</strong>
+                <small>
+                  {"type" in r
+                    ? String(r.type) +
+                      " · " +
+                      ("provenance" in r ? r.provenance : "")
+                    : "Jump to page"}
+                </small>
+              </span>
+              <ArrowRight size={17} />
+            </Link>
+          </div>
         ))}
-        {!results.length && (
-          <p>No suggestions found. Try a capability or a broader outcome.</p>
-        )}
+        {!options.length && <p>No suggestions found. Try a broader outcome.</p>}
       </div>
+      <span className="sr-only" role="status">
+        {results.length} search suggestions
+      </span>
       <div className="command-foot">
         <Command size={14} /> Search the ecosystem <span>Esc to close</span>
       </div>
@@ -376,9 +438,9 @@ export function Layout() {
               <Bell size={20} />
               {notifications.some((n) => !n.read) && <i />}
             </Link>
-            <ButtonLink to="/app/projects/new" variant="gold">
+            <ButtonLink to="/creator/builds/new" variant="gold">
               <Plus size={18} />
-              <span>Post a Project</span>
+              <span>Publish a Build</span>
             </ButtonLink>
             <button
               className="avatar account-button"
@@ -390,7 +452,9 @@ export function Layout() {
           </div>
         </header>
         <main id="main" tabIndex={-1}>
-          <Outlet />
+          <Suspense fallback={<Skeleton />}>
+            <Outlet />
+          </Suspense>
         </main>
         <footer>
           <Link className="brand footer-brand" to="/">
@@ -444,6 +508,7 @@ export function Layout() {
       >
         <div className="account-links">
           {[
+            ["/creator", "Creator workspace"],
             ["/app", "Buyer workspace"],
             ["/provider", "Provider workspace"],
             ["/app/profile", "Profile"],

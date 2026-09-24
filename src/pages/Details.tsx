@@ -1,3 +1,4 @@
+import { RelatedBuilds } from "../components/builds/related";
 import { ProductMediaList } from "../components/media";
 import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -131,6 +132,26 @@ export default function Details() {
           )}
         </div>
       </div>
+      {[
+        "technologies",
+        "providers",
+        "use-cases",
+        "solution-stacks",
+        "categories",
+      ].includes(type) && (
+        <RelatedBuilds
+          productId={type === "technologies" ? p?.id : undefined}
+          providerId={type === "providers" ? provider?.id : undefined}
+          useCaseId={
+            type === "use-cases"
+              ? useCase?.id
+              : type === "solution-stacks"
+                ? stack?.useCaseId
+                : undefined
+          }
+          category={type === "categories" ? category?.id : undefined}
+        />
+      )}
       {(type === "use-cases" || type === "solution-stacks") && stack ? (
         <div className="detail-columns">
           <section>

@@ -5,6 +5,9 @@ import {
   providerRoutes,
   adminRoutes,
   authRoutes,
+  creatorRoutes,
+  buildAdminRoutes,
+  buildProviderRoutes,
 } from "../src/routes.ts";
 import {
   products,
@@ -16,7 +19,10 @@ import {
   consultants,
   articles,
 } from "../src/data/seed.ts";
+import { builds, creators } from "../src/data/build-seed.ts";
 const entities = [
+  ["builds", builds],
+  ["creators", creators],
   ["technologies", products],
   ["providers", providers],
   ["use-cases", useCases],
@@ -30,7 +36,7 @@ const entities = [
   records.map((r) => ({
     path: "/" + type + "/" + r.slug,
     name: r.name,
-    description: r.description,
+    description: r.description ?? r.headline,
     type,
     category: r.category,
   })),
@@ -42,6 +48,9 @@ const routes = [
     ...providerRoutes,
     ...adminRoutes,
     ...authRoutes,
+    ...creatorRoutes,
+    ...buildAdminRoutes,
+    ...buildProviderRoutes,
     ...entities.map((e) => e.path),
   ]),
 ];
@@ -65,9 +74,10 @@ for (const route of routes) {
       name +
       " on Oracnet, the use-case-first technology marketplace.";
   const canonical = "https://bt3113.github.io/OCNET" + route;
-  const privatePage = /^\/(app|admin|provider\b|sign-|forgot|onboarding)/.test(
-    route,
-  );
+  const privatePage =
+    /^\/(app|admin|provider\b|creator\b|collections\b|sign-|forgot|onboarding)/.test(
+      route,
+    );
   const graph = [
     {
       "@type": "Organization",
@@ -125,14 +135,17 @@ writeFileSync(
 writeFileSync("dist/.nojekyll", "");
 writeFileSync(
   "dist/robots.txt",
-  "User-agent: *\nAllow: /OCNET/\nDisallow: /OCNET/app\nDisallow: /OCNET/provider/\nDisallow: /OCNET/admin\nSitemap: https://bt3113.github.io/OCNET/sitemap.xml\n",
+  "User-agent: *\nAllow: /OCNET/\nDisallow: /OCNET/app\nDisallow: /OCNET/provider/\nDisallow: /OCNET/admin\nDisallow: /OCNET/creator/\nDisallow: /OCNET/collections\nSitemap: https://bt3113.github.io/OCNET/sitemap.xml\n",
 );
 writeFileSync(
   "dist/sitemap.xml",
   '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
     routes
       .filter(
-        (r) => !/^\/(app|admin|provider\b|sign-|forgot|onboarding)/.test(r),
+        (r) =>
+          !/^\/(app|admin|provider\b|creator\b|collections\b|sign-|forgot|onboarding)/.test(
+            r,
+          ),
       )
       .map(
         (r) => "<url><loc>https://bt3113.github.io/OCNET" + r + "</loc></url>",

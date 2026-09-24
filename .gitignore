@@ -7,3 +7,5 @@ playwright-report/
 test-results/
 qa/
 *.tsbuildinfo
+
+public/fonts/*.ttf

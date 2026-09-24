@@ -1,3 +1,4 @@
+import { BuildComparisonPanel } from "../components/builds/compare";
 import { Link } from "react-router-dom";
 import { ArrowRight, Plus, Download, X } from "lucide-react";
 import { useRecords, useActions, useUI } from "../state";
@@ -23,6 +24,7 @@ export default function Compare() {
           </ButtonLink>
         }
       />
+      <BuildComparisonPanel />
       {!selected.length ? (
         <EmptyState
           title="Good decisions start with comparison"

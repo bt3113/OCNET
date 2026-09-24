@@ -63,3 +63,9 @@ Move to a host supporting server-rendered entity metadata, security headers and 
 - [Deployment](docs/deployment.md)
 - [Security / threat model](docs/security.md)
 - [QA evidence and limits](docs/qa.md)
+
+## Builds and creators
+
+The marketplace now connects outcomes to creator-published **Builds**: concrete implementation blueprints, technology stacks, architecture diagrams, evidence, reuse permissions and offers. Procurement Projects remain separate. Explore six clearly labelled examples, publish your own browser-local Build, remix permitted blueprints, compare Builds, organize private collections, and contact creators in demo messages. Accounts support multiple roles.
+
+The nine-step publisher supports public GitHub import, manual entry, original media, use cases, confirmed technologies, architecture, implementation/license details, offers and review. Connected publication enters moderation. Creator, provider and admin workspaces extend the same interface. See [Build marketplace](docs/build-marketplace.md) for routes, permissions, import boundaries and production prerequisites. The relational migration, optional Auth-bound seed, full-text search and PostgreSQL RLS tests accompany the frontend.

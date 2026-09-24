@@ -13,6 +13,7 @@ import {
   getRepository,
   isSupabase,
 } from "./data/repository";
+import { demoIdentity, demoPersonas } from "./data/identity";
 import type { Table, Tables, Role, Provider } from "./data/model";
 export function useRecords<K extends Table>(table: K) {
   const client = useQueryClient();
@@ -70,19 +71,40 @@ interface UIState {
   setCommand: (value: boolean) => void;
   contact: Provider | null;
   setContact: (value: Provider | null) => void;
+  userId: string;
+  userName: string;
+  roles: Role[];
+  setPersona: (id: string) => void;
   role: Role;
   setRole: (role: Role) => void;
 }
 const UI = createContext<UIState | null>(null);
 export function UIProvider({ children }: { children: ReactNode }) {
+  const client = useQueryClient();
+  const [identity, setIdentity] = useState(() =>
+    isSupabase
+      ? { id: "", name: "Your account", roles: [] as Role[] }
+      : demoIdentity(),
+  );
+  function setPersona(id: string) {
+    if (isSupabase || !(id in demoPersonas)) return;
+    localStorage.setItem("oracnet-persona", id);
+    setIdentity(demoIdentity());
+    client.clear();
+  }
   const [toast, setToast] = useState("");
   const [command, setCommand] = useState(false);
   const [contact, setContact] = useState<Provider | null>(null);
   const [role, updateRole] = useState<Role>(() => {
     const v = localStorage.getItem("oracnet-role");
-    return ["buyer", "provider", "integrator", "consultant", "admin"].includes(
-      v ?? "",
-    )
+    return [
+      "buyer",
+      "creator",
+      "provider",
+      "integrator",
+      "consultant",
+      "admin",
+    ].includes(v ?? "")
       ? (v as Role)
       : "buyer";
   });
@@ -93,14 +115,65 @@ export function UIProvider({ children }: { children: ReactNode }) {
     }
   }
   useEffect(() => {
-    if (isSupabase)
-      void import("./data/supabase").then(async ({ supabase }) => {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        updateRole((user?.app_metadata.role as Role) || "buyer");
-      });
-  }, []);
+    if (!isSupabase) return;
+    let cleanup: (() => void) | undefined;
+    let active = true;
+    void import("./data/supabase").then(async ({ supabase }) => {
+      const sync = (
+        user: {
+          id: string;
+          app_metadata: Record<string, unknown>;
+          email?: string;
+        } | null,
+      ) => {
+        if (!active) return;
+        const trusted = Array.isArray(user?.app_metadata.roles)
+          ? (user.app_metadata.roles as Role[])
+          : user?.app_metadata.role
+            ? [user.app_metadata.role as Role]
+            : [];
+        setIdentity({
+          id: user?.id || "",
+          name: user?.email || "Your account",
+          roles: trusted,
+        });
+        updateRole(trusted[0] || "buyer");
+        client.clear();
+        // Defer database access until the Auth callback has released its lock.
+        if (user)
+          queueMicrotask(() => {
+            void supabase
+              .from("user_roles")
+              .select("role")
+              .eq("userId", user.id)
+              .then(({ data, error }) => {
+                if (!active || error) return;
+                const roles = [
+                  ...new Set([
+                    ...trusted,
+                    ...(data ?? []).map((r) => r.role as Role),
+                  ]),
+                ];
+                setIdentity((current) =>
+                  current.id === user.id ? { ...current, roles } : current,
+                );
+              });
+          });
+      };
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      sync(user);
+      const { data } = supabase.auth.onAuthStateChange((_event, session) =>
+        sync(session?.user ?? null),
+      );
+      cleanup = () => data.subscription.unsubscribe();
+    });
+    return () => {
+      active = false;
+      cleanup?.();
+    };
+  }, [client]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4500);
@@ -109,6 +182,12 @@ export function UIProvider({ children }: { children: ReactNode }) {
   return (
     <UI.Provider
       value={{
+        userId: identity.id,
+        userName: identity.name,
+        roles: isSupabase
+          ? identity.roles
+          : [...new Set([...identity.roles, role])],
+        setPersona,
         notify: setToast,
         command,
         setCommand,

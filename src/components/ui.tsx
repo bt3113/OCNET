@@ -278,8 +278,11 @@ export function SaveButton({
 }) {
   const { data = [] } = useRecords("saved_items");
   const actions = useActions();
-  const { notify } = useUI();
-  const active = data.some((s) => s.entityId === id);
+  const { notify, userId } = useUI();
+  const existing = data.find(
+    (s) => s.entityId === id && (!s.ownerId || s.ownerId === userId),
+  );
+  const active = !!existing;
   return (
     <button
       className={"icon-button " + (active ? "selected" : "")}
@@ -287,10 +290,15 @@ export function SaveButton({
       aria-pressed={active}
       onClick={() =>
         void (async () => {
-          if (active) await actions.remove("saved_items", id);
+          if (!userId) {
+            notify("Sign in to save items.");
+            return;
+          }
+          if (existing) await actions.remove("saved_items", existing.id);
           else
             await actions.save("saved_items", {
-              id,
+              id: userId + ":" + type + ":" + id,
+              ownerId: userId,
               name,
               entityId: id,
               entityType: type,

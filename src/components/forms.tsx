@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, ArrowLeft, Check, Send } from "lucide-react";
 import { useActions, useUI, useRecords } from "../state";
 import { isSupabase } from "../data/repository";
@@ -20,6 +20,9 @@ export const projectSchema = z.object({
 });
 export type ProjectInput = z.infer<typeof projectSchema>;
 export function ProjectWizard() {
+  const [params] = useSearchParams();
+  const { data: builds = [] } = useRecords("builds");
+  const sourceBuild = builds.find((b) => b.id === params.get("build"));
   const [step, setStep] = useState(0);
   const actions = useActions();
   const { notify } = useUI();
@@ -27,6 +30,7 @@ export function ProjectWizard() {
   const { data: categories = [] } = useRecords("categories");
   const {
     register,
+    setValue,
     handleSubmit,
     trigger,
     watch,
@@ -34,13 +38,32 @@ export function ProjectWizard() {
   } = useForm<ProjectInput>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
-      name: "",
-      description: "",
+      name: sourceBuild ? "Adapt " + sourceBuild.name : "",
+      description: sourceBuild
+        ? sourceBuild.tagline +
+          "\n\nInspired by: " +
+          sourceBuild.name +
+          ". Please evaluate the stack and adapt it to our requirements."
+        : "",
       category: "ai-software",
       budget: "To be discussed",
       timeline: "1–3 months",
     },
   });
+  const initializedBuild = useRef<string | null>(null);
+  useEffect(() => {
+    if (sourceBuild && initializedBuild.current !== sourceBuild.id) {
+      initializedBuild.current = sourceBuild.id;
+      setValue("name", "Adapt " + sourceBuild.name);
+      setValue(
+        "description",
+        sourceBuild.tagline +
+          "\n\nInspired by: " +
+          sourceBuild.name +
+          ". Please evaluate the stack and adapt it to our requirements.",
+      );
+    }
+  }, [sourceBuild, setValue]);
   async function submit(data: ProjectInput) {
     const id = crypto.randomUUID();
     try {
@@ -48,7 +71,9 @@ export function ProjectWizard() {
         ...data,
         id,
         status: "open",
-        capabilities: [],
+        capabilities: sourceBuild?.capabilityIds ?? [],
+        sourceBuildId: sourceBuild?.id,
+        sourceStackProductIds: sourceBuild?.stack.map((s) => s.productId),
         provenance: isSupabase ? "community supplied" : "demo",
         createdAt: new Date().toISOString(),
       });

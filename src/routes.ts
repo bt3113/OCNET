@@ -1,5 +1,8 @@
 export const publicRoutes = [
   "/",
+  "/builds",
+  "/creators",
+  "/collections",
   "/explore",
   "/search",
   "/use-cases",
@@ -73,3 +76,22 @@ export const authRoutes = [
   "/forgot-password",
   "/onboarding",
 ];
+
+export const creatorRoutes = [
+  "/creator",
+  "/creator/builds",
+  "/creator/builds/new",
+  "/creator/offers",
+  "/creator/messages",
+  "/creator/analytics",
+  "/creator/profile",
+  "/creator/settings",
+];
+export const buildAdminRoutes = [
+  "/admin/builds",
+  "/admin/creators",
+  "/admin/offers",
+  "/admin/reports",
+  "/admin/claims",
+];
+export const buildProviderRoutes = ["/provider/builds", "/provider/claims"];

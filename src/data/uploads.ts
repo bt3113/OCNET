@@ -1,4 +1,8 @@
-export async function supabaseUpload(file: File) {
+export async function supabaseUpload(
+  file: File,
+  bucket = "company-media",
+  persistent = false,
+) {
   const { supabase } = await import("./supabase");
   const {
     data: { user },
@@ -15,12 +19,12 @@ export async function supabaseUpload(file: File) {
         ? "webp"
         : "jpg");
   const { error } = await supabase.storage
-    .from("company-media")
+    .from(bucket)
     .upload(path, file, { contentType: file.type, upsert: false });
   if (error) throw error;
   const { data, error: signError } = await supabase.storage
-    .from("company-media")
+    .from(bucket)
     .createSignedUrl(path, 3600);
   if (signError) throw signError;
-  return data.signedUrl;
+  return persistent ? "storage://" + bucket + "/" + path : data.signedUrl;
 }

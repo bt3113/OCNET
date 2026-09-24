@@ -21,3 +21,15 @@ Sensitive information should not be entered into the browser demo. Auth password
 The SQL migration is prepared source; local frontend tests do not prove deployed RLS. It must be applied and tested with real Supabase identities. OWASP ASVS principles guide the design; this is not a certification or a completed security audit.
 
 Official references: https://supabase.com/docs/guides/database/postgres/row-level-security and https://supabase.com/docs/guides/storage/security/access-control.
+
+## Build release threats and controls
+
+- Cross-account access: relational RLS covers ownership, collaborator and organization roles. PostgreSQL tests exercise anonymous, owner, unrelated and admin users.
+- Self-promotion: trusted role storage; triggers block owner/creator changes, self-verification, feature status and unreviewed publication changes. Child graph edits invalidate approval. Audit events are trigger-written and immutable to clients.
+- Attribution theft: server checks parent remix permission, retained license, attribution and commercial-use limits. Published slugs and fork parent are immutable.
+- Private graph leakage: public discovery filters publication/visibility/moderation; unlisted lookup requires exact slug. Search uses a security-invoker public document view. Embeddings/hybrid access is service-only.
+- Imported malicious content: imported HTML/README are treated as text, never rendered HTML. Active URL schemes and embedded credentials are rejected. The Edge importer has authenticated budgets and bounded responses. General URL fetching requires a DNS-pinning gateway and otherwise fails closed.
+- GitHub tokens: public demo import is tokenless. Connected OAuth uses PKCE with minimal identity scopes; provider tokens are stripped from persistence. No private repo scope is requested.
+- Marketplace fraud: offers and questions enter moderation; reports/claims have private access. No live transaction or claim of escrow/security verification is implied.
+
+Provisioned Supabase, OAuth, storage signing, gateway behavior and Realtime still require staging acceptance. The checked-in PostgreSQL tests verify migrations/RLS/RPCs locally; they do not claim a deployed backend. The optional vector migration requires pgvector in the public schema; provision/reconcile extension placement before applying to an existing database.
