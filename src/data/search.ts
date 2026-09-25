@@ -6,13 +6,21 @@ import type {
   SolutionStack,
   Article,
 } from "./model";
+import type {
+  Blueprint,
+  ImplementationContext,
+  ImplementationRecord,
+} from "./intelligence-model";
 import { isPublicBuild, completeness } from "./build-domain";
 export type SearchType =
+  | "Implementation"
+  | "Blueprint"
   | "Build"
   | "Technology"
   | "Use case"
   | "Creator"
   | "Provider"
+  | "Implementer"
   | "Stack"
   | "Resource";
 export interface SearchDocument {
@@ -27,107 +35,189 @@ export interface SearchDocument {
   provenance: string;
 }
 export interface SearchCatalogue {
+  implementations: ImplementationRecord[];
+  implementationContexts: ImplementationContext[];
+  blueprints: Blueprint[];
   builds: Build[];
   products: Product[];
   creators: CreatorProfile[];
   providers: Provider[];
+  implementers: Provider[];
   cases: UseCase[];
   stacks: SolutionStack[];
   articles: Article[];
 }
 export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
   return [
-    ...c.builds.filter(isPublicBuild).map((b) => ({
-      id: b.id,
-      name: b.name,
-      description: b.tagline,
+    ...c.implementations
+      .filter(
+        (implementation) =>
+          implementation.publicationState === "published" &&
+          implementation.moderationState === "approved" &&
+          implementation.visibility === "public",
+      )
+      .map((implementation) => {
+        const context = c.implementationContexts.find(
+          (item) => item.implementationId === implementation.id,
+        );
+        const completenessScore = [
+          implementation.summary,
+          implementation.contextSummary,
+          implementation.implementationDuration,
+          context?.volumeLabel,
+          implementation.lastEvidenceReviewAt,
+        ].filter(Boolean).length;
+        return {
+          id: implementation.id,
+          name: implementation.name,
+          description: implementation.summary,
+          text: [
+            implementation.industry,
+            implementation.businessType,
+            implementation.organizationSizeBand,
+            implementation.region,
+            implementation.contextSummary,
+            implementation.verificationState,
+            context?.existingSystems.join(" "),
+            context?.workflowCharacteristics.join(" "),
+          ].join(" "),
+          type: "Implementation" as const,
+          path: "/implementations/" + implementation.slug,
+          updatedAt: implementation.updatedAt,
+          completeness: Math.min(100, completenessScore * 16),
+          provenance: implementation.provenance,
+        };
+      }),
+    ...c.blueprints
+      .filter(
+        (blueprint) =>
+          blueprint.publicationState === "published" &&
+          blueprint.moderationState === "approved",
+      )
+      .map((blueprint) => ({
+        id: blueprint.id,
+        name: blueprint.name,
+        description: blueprint.description,
+        text: [
+          ...blueprint.capabilityIds,
+          ...blueprint.requiredSkills,
+          blueprint.reuseRights,
+          blueprint.estimatedComplexity,
+          blueprint.knownLimitations,
+          blueprint.compatibilityState,
+        ].join(" "),
+        type: "Blueprint" as const,
+        path: "/blueprints/" + blueprint.slug,
+        updatedAt: blueprint.updatedAt,
+        completeness: 75,
+        provenance: blueprint.provenance,
+      })),
+    ...c.builds.filter(isPublicBuild).map((build) => ({
+      id: build.id,
+      name: build.name,
+      description: build.tagline,
       text: [
-        b.description,
-        b.industry,
-        ...b.capabilityIds,
-        ...b.stack.map(
-          (s) => c.products.find((p) => p.id === s.productId)?.name ?? "",
+        build.description,
+        build.industry,
+        ...build.capabilityIds,
+        ...build.stack.map(
+          (item) => c.products.find((product) => product.id === item.productId)?.name ?? "",
         ),
-        ...b.useCaseIds.map((i) => c.cases.find((u) => u.id === i)?.name ?? ""),
-        c.creators.find((x) => x.id === b.creatorId)?.name ?? "",
+        ...build.useCaseIds.map(
+          (id) => c.cases.find((useCase) => useCase.id === id)?.name ?? "",
+        ),
+        c.creators.find((creator) => creator.id === build.creatorId)?.name ?? "",
       ].join(" "),
       type: "Build" as const,
-      path: "/builds/" + b.slug,
-      updatedAt: b.updatedAt,
-      completeness: completeness(b),
-      provenance: b.provenance,
+      path: "/builds/" + build.slug,
+      updatedAt: build.updatedAt,
+      completeness: completeness(build),
+      provenance: build.provenance,
     })),
-    ...c.products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
+    ...c.products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
       text: [
-        ...p.capabilityIds,
-        p.category,
-        c.providers.find((v) => v.id === p.providerId)?.name,
+        ...product.capabilityIds,
+        product.category,
+        c.providers.find((provider) => provider.id === product.providerId)?.name,
       ].join(" "),
       type: "Technology" as const,
-      path: "/technologies/" + p.slug,
+      path: "/technologies/" + product.slug,
       completeness: 50,
-      provenance: p.provenance,
+      provenance: product.provenance,
     })),
-    ...c.cases.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      text: p.outcome,
+    ...c.cases.map((useCase) => ({
+      id: useCase.id,
+      name: useCase.name,
+      description: useCase.description,
+      text: useCase.outcome,
       type: "Use case" as const,
-      path: "/use-cases/" + p.slug,
+      path: "/use-cases/" + useCase.slug,
       completeness: 50,
-      provenance: p.provenance,
+      provenance: useCase.provenance,
     })),
-    ...c.creators.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.headline,
+    ...c.creators.map((creator) => ({
+      id: creator.id,
+      name: creator.name,
+      description: creator.headline,
       text: [
-        p.bio,
-        ...p.expertise,
-        ...p.technologyIds.map(
-          (i) => c.products.find((x) => x.id === i)?.name ?? "",
+        creator.bio,
+        ...creator.expertise,
+        ...creator.technologyIds.map(
+          (id) => c.products.find((product) => product.id === id)?.name ?? "",
         ),
       ].join(" "),
       type: "Creator" as const,
-      path: "/creators/" + p.slug,
+      path: "/creators/" + creator.slug,
       completeness: 50,
-      provenance: p.provenance,
+      provenance: creator.provenance,
     })),
-    ...c.providers.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      text: p.specialties.join(" "),
+    ...c.providers.map((provider) => ({
+      id: provider.id,
+      name: provider.name,
+      description: provider.description,
+      text: provider.specialties.join(" "),
       type: "Provider" as const,
-      path: "/providers/" + p.slug,
+      path: "/providers/" + provider.slug,
       completeness: 50,
-      provenance: p.provenance,
+      provenance: provider.provenance,
     })),
-    ...c.stacks.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      text: p.items
-        .map((i) => c.products.find((x) => x.id === i.productId)?.name ?? "")
+    ...c.implementers.map((provider) => ({
+      id: `implementer-${provider.id}`,
+      name: provider.name,
+      description: provider.description,
+      text: [provider.region, ...provider.specialties].join(" "),
+      type: "Implementer" as const,
+      path: "/integrators/" + provider.slug,
+      completeness: 50,
+      provenance: provider.provenance,
+    })),
+    ...c.stacks.map((stack) => ({
+      id: stack.id,
+      name: stack.name,
+      description: stack.description,
+      text: stack.items
+        .map(
+          (item) =>
+            c.products.find((product) => product.id === item.productId)?.name ?? "",
+        )
         .join(" "),
       type: "Stack" as const,
-      path: "/solution-stacks/" + p.slug,
+      path: "/solution-stacks/" + stack.slug,
       completeness: 50,
-      provenance: p.provenance,
+      provenance: stack.provenance,
     })),
-    ...c.articles.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      text: p.body,
+    ...c.articles.map((article) => ({
+      id: article.id,
+      name: article.name,
+      description: article.description,
+      text: article.body,
       type: "Resource" as const,
-      path: "/resources/" + p.slug,
+      path: "/resources/" + article.slug,
       completeness: 50,
-      provenance: p.provenance,
+      provenance: article.provenance,
     })),
   ];
 }
@@ -160,25 +250,28 @@ export function searchIndex(
     query
       .toLowerCase()
       .match(/[a-z0-9]+/g)
-      ?.filter((t) => !stop.has(t)) ?? [];
+      ?.filter((term) => !stop.has(term)) ?? [];
   return docs
-    .filter((d) => !type || d.type === type)
-    .map((d) => {
-      const name = d.name.toLowerCase(),
-        text = [d.name, d.description, d.text].join(" ").toLowerCase();
-      const matches = terms.filter((t) => text.includes(t)).length;
+    .filter((document) => !type || document.type === type)
+    .map((document) => {
+      const name = document.name.toLowerCase();
+      const text = [document.name, document.description, document.text]
+        .join(" ")
+        .toLowerCase();
+      const matches = terms.filter((term) => text.includes(term)).length;
       const exact = name === query.toLowerCase() ? 100 : 0;
       const score =
         exact +
         terms.reduce(
-          (n, t) => n + (name.includes(t) ? 12 : text.includes(t) ? 5 : 0),
+          (total, term) =>
+            total + (name.includes(term) ? 12 : text.includes(term) ? 5 : 0),
           0,
         ) +
-        (d.type === "Build" ? 2 : 0) +
-        d.completeness / 100;
-      return { ...d, score, matches };
+        (document.type === "Implementation" ? 2 : 0) +
+        document.completeness / 100;
+      return { ...document, score, matches };
     })
-    .filter((d) => !terms.length || d.matches === terms.length)
+    .filter((document) => !terms.length || document.matches === terms.length)
     .sort(
       (a, b) =>
         b.score - a.score ||
