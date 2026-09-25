@@ -90,7 +90,7 @@ export function ImplementationCard({
   context?: ImplementationContext;
   metrics?: ImplementationMetric[];
   metricDefinitions?: MetricDefinition[];
-  similarity?: { level: "high" | "medium" | "low"; score: number; reasons: string[] };
+  similarity?: Pick<ContextSimilarity, "level" | "score" | "reasons">;
 }) {
   const responseMetric = metrics.find((metric) => metric.metricDefinitionId === "first-response-time");
   const bookingMetric = metrics.find((metric) => metric.metricDefinitionId === "booking-rate");
