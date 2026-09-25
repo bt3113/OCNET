@@ -32,10 +32,13 @@ export default function IntelligenceWorkspace() {
   const data = useIntelligence();
   if (data.isLoading) return <Skeleton />;
   if (data.isError) return <ErrorState retry={data.refetch} />;
-  if (path.startsWith("/admin/") && !roles.includes("admin"))
-    return <EmptyState title="Reviewer access required" description={isSupabase ? "Verification operations need a trusted reviewer role, enforced by the database." : "Switch to the demo moderator persona in Settings to try review operations."} to="/app/settings" action="Open settings" />;
-  if (path.startsWith("/provider/") && !roles.includes("provider") && !roles.includes("admin"))
-    return <EmptyState title="Provider access required" description="Switch to a provider persona (demo) or sign in with a provider account." to="/app/settings" action="Open settings" />;
+  // Demo mode deliberately opens review and provider tools to every visitor so the
+  // workflow can be tried; nothing leaves the browser. Connected mode requires a
+  // trusted role here AND is enforced by RLS/Edge Functions server-side.
+  if (isSupabase && path.startsWith("/admin/") && !roles.includes("admin"))
+    return <EmptyState title="Reviewer access required" description="Verification operations need a trusted reviewer role, enforced by the database." to="/" action="Back to Oracnet" />;
+  if (isSupabase && path.startsWith("/provider/") && !roles.includes("provider") && !roles.includes("admin"))
+    return <EmptyState title="Provider access required" description="Sign in with a provider account." to="/" action="Back to Oracnet" />;
   switch (path) {
     case "/creator/implementations":
       return <CreatorImplementations data={data} userId={userId} />;
@@ -327,6 +330,8 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
   const [note, setNote] = useState<Record<string, string>>({});
   const now = () => new Date();
   const reviewer = userId || "demo-reviewer";
+  // Connected mode: database triggers write the append-only audit trail; clients cannot.
+  const saveAudit = (event: Parameters<typeof actions.save<"audit_events">>[1]) => (isSupabase ? Promise.resolve(event) : actions.save("audit_events", event));
   const run = async (work: () => Promise<unknown>, message: string) => {
     try {
       await work();
@@ -337,6 +342,7 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
   };
   const frame = (title: string, description: string, children: ReactNode) => (
     <Frame eyebrow="REVIEW & VERIFICATION" title={title} description={description}>
+      {!isSupabase && <p className="notice demo-admin-note">Demo: review tools are open to every visitor and only change data in this browser. In connected mode only trusted reviewers can act, enforced by the database.</p>}
       <nav className="admin-tabs" aria-label="Review queues">
         {[["implementations", "Implementations"], ["claims", "Claims"], ["evidence", "Evidence"], ["attestations", "Attestations"], ["blueprints", "Blueprints"], ["compatibility", "Compatibility"], ["staleness", "Freshness"], ["audit", "Audit"]].map(([id, label]) => (
           <Link key={id} to={`/admin/${id}`} aria-current={path === `/admin/${id}` ? "page" : undefined}>{label}</Link>
@@ -358,7 +364,7 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
             <span className="row wrap"><RightsBadge rights={record.rightsState} /><StalenessBadge state={implementationFreshness(record, now()).state} /></span>
             <span className="row wrap admin-actions">
               {(["approve", "flag", "reject", "archive"] as const).map((decision) => (
-                <button key={decision} type="button" className="button light" onClick={() => void run(async () => { const result = moderateImplementation(record, decision, reviewer, now()); await actions.save("implementation_records", result.record); await actions.save("audit_events", result.audit); }, `Implementation ${decision}d.`)}>
+                <button key={decision} type="button" className="button light" onClick={() => void run(async () => { const result = moderateImplementation(record, decision, reviewer, now()); await actions.save("implementation_records", result.record); await saveAudit(result.audit); }, `Implementation ${decision}d.`)}>
                   {decision === "approve" ? <CheckCircle2 size={14} aria-hidden /> : decision === "archive" ? <Archive size={14} aria-hidden /> : decision === "flag" ? <Flag size={14} aria-hidden /> : <XCircle size={14} aria-hidden />} {decision[0].toUpperCase() + decision.slice(1)}
                 </button>
               ))}
@@ -380,11 +386,11 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
               {noteField(claim.id)}
               <span className="row wrap">
                 {(["sufficient", "needs-more-evidence", "insufficient"] as const).map((result) => (
-                  <button key={result} type="button" className="button light" onClick={() => void run(async () => { const outcome = reviewClaim(claim, result, reviewer, note[claim.id] ?? "", now()); await actions.save("claims", outcome.claim); await actions.save("evidence_reviews", outcome.review); await actions.save("verification_events", outcome.event); await actions.save("audit_events", outcome.audit); }, `Claim marked ${result.replaceAll("-", " ")}.`)}>
+                  <button key={result} type="button" className="button light" onClick={() => void run(async () => { const outcome = reviewClaim(claim, result, reviewer, note[claim.id] ?? "", now()); await actions.save("claims", outcome.claim); await actions.save("evidence_reviews", outcome.review); await actions.save("verification_events", outcome.event); await saveAudit(outcome.audit); }, `Claim marked ${result.replaceAll("-", " ")}.`)}>
                     {result === "sufficient" ? "Evidence sufficient" : result === "insufficient" ? "Insufficient" : "Request more"}
                   </button>
                 ))}
-                <button type="button" className="button light" onClick={() => void run(async () => { const outcome = revokeClaim(claim, reviewer, note[claim.id] ?? "", now()); await actions.save("claims", outcome.claim); await actions.save("verification_events", outcome.event); await actions.save("audit_events", outcome.audit); }, "Verification revoked.")}>
+                <button type="button" className="button light" onClick={() => void run(async () => { const outcome = revokeClaim(claim, reviewer, note[claim.id] ?? "", now()); await actions.save("claims", outcome.claim); await actions.save("verification_events", outcome.event); await saveAudit(outcome.audit); }, "Verification revoked.")}>
                   <ShieldX size={14} aria-hidden /> Revoke
                 </button>
               </span>
@@ -432,7 +438,7 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
             <span className="row wrap">
               {attestation.id === "demo-attestation" && attestation.status === "pending" && <Link className="button light" to="/verify/demo-attestation-token-illustrative-only-not-a-secret">Open demo walkthrough</Link>}
               {attestation.status === "pending" && (
-                <button type="button" className="button light" onClick={() => void run(async () => { await actions.save("attestations", { ...attestation, status: "revoked", revokedAt: now().toISOString() }); await actions.save("audit_events", auditEvent(reviewer, "attestation", attestation.id, "attestation-revoked", now())); }, "Invitation revoked.")}>Revoke</button>
+                <button type="button" className="button light" onClick={() => void run(async () => { await actions.save("attestations", { ...attestation, status: "revoked", revokedAt: now().toISOString() }); await saveAudit(auditEvent(reviewer, "attestation", attestation.id, "attestation-revoked", now())); }, "Invitation revoked.")}>Revoke</button>
               )}
             </span>
           </div>
@@ -451,8 +457,8 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
               <span><Link to={`/blueprints/${blueprint.slug}`}><strong>{blueprint.name}</strong></Link><small>{blueprint.publicationState} · {blueprint.moderationState} · checklist {blueprint.sanitizationChecklist?.length ?? 0}/{sanitizationChecklist.length}</small>{!gate.ready && <small className="warn">{gate.missing.join(" ")}</small>}<small>{findings.length ? `${findings.length} scanner finding(s): ${findings.map((finding) => finding.kind).join(", ")}` : "Scanner: no findings in public text."}</small></span>
               <RightsBadge rights={blueprint.reuseRights} />
               <span className="row wrap">
-                <button type="button" className="button light" onClick={() => void run(async () => { const outcome = moderateBlueprint(blueprint, "approve", reviewer, now()); await actions.save("blueprints", outcome.blueprint); await actions.save("audit_events", outcome.audit); }, "Blueprint approved and published.")}>Approve</button>
-                <button type="button" className="button light" onClick={() => void run(async () => { const outcome = moderateBlueprint(blueprint, "reject", reviewer, now()); await actions.save("blueprints", outcome.blueprint); await actions.save("audit_events", outcome.audit); }, "Blueprint rejected.")}>Reject</button>
+                <button type="button" className="button light" onClick={() => void run(async () => { const outcome = moderateBlueprint(blueprint, "approve", reviewer, now()); await actions.save("blueprints", outcome.blueprint); await saveAudit(outcome.audit); }, "Blueprint approved and published.")}>Approve</button>
+                <button type="button" className="button light" onClick={() => void run(async () => { const outcome = moderateBlueprint(blueprint, "reject", reviewer, now()); await actions.save("blueprints", outcome.blueprint); await saveAudit(outcome.audit); }, "Blueprint rejected.")}>Reject</button>
               </span>
             </div>
           );
@@ -476,7 +482,7 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
                     {["native-integration", "api-compatible", "webhook-compatible", "connector-available", "requires-middleware", "custom-integration-required", "observed-together", "incompatible", "unknown"].map((type) => <option key={type} value={type}>{type.replaceAll("-", " ")}</option>)}
                   </select>
                   {(["confirmed", "conditional", "failed"] as const).map((result) => (
-                    <button key={result} type="button" className="button light" onClick={() => void run(async () => { const outcome = reviewRelationship(relationship, (note[`${relationship.id}:type`] as TechnologyRelationshipType) ?? relationship.relationshipType, result, reviewer, note[relationship.id] ?? "", now()); await actions.save("technology_relationships", outcome.relationship); await actions.save("compatibility_checks", outcome.check); await actions.save("audit_events", outcome.audit); }, `Compatibility check recorded (${result}).`)}>{result}</button>
+                    <button key={result} type="button" className="button light" onClick={() => void run(async () => { const outcome = reviewRelationship(relationship, (note[`${relationship.id}:type`] as TechnologyRelationshipType) ?? relationship.relationshipType, result, reviewer, note[relationship.id] ?? "", now()); await actions.save("technology_relationships", outcome.relationship); await actions.save("compatibility_checks", outcome.check); await saveAudit(outcome.audit); }, `Compatibility check recorded (${result}).`)}>{result}</button>
                   ))}
                 </span>
               </span>
@@ -497,8 +503,8 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
               <span><strong>{record.name}</strong><small>Implementation evidence · {freshness.reasons.join(" ")}</small></span>
               <StalenessBadge state={freshness.state} />
               <span className="row wrap">
-                <button type="button" className="button light" onClick={() => void run(async () => { await actions.save("implementation_records", { ...record, lastEvidenceReviewAt: date.toISOString().slice(0, 10), nextEvidenceReviewAt: new Date(date.getTime() + 180 * 86400000).toISOString().slice(0, 10) }); await actions.save("audit_events", auditEvent(reviewer, "implementation", record.id, "evidence-rereviewed", date)); }, "Marked reviewed today; next review scheduled in 180 days.")}><CalendarClock size={14} aria-hidden /> Reviewed today</button>
-                <button type="button" className="button light" onClick={() => void run(async () => { const outcome = moderateImplementation(record, "archive", reviewer, date); await actions.save("implementation_records", outcome.record); await actions.save("audit_events", outcome.audit); }, "Record archived.")}><Archive size={14} aria-hidden /> Archive</button>
+                <button type="button" className="button light" onClick={() => void run(async () => { await actions.save("implementation_records", { ...record, lastEvidenceReviewAt: date.toISOString().slice(0, 10), nextEvidenceReviewAt: new Date(date.getTime() + 180 * 86400000).toISOString().slice(0, 10) }); await saveAudit(auditEvent(reviewer, "implementation", record.id, "evidence-rereviewed", date)); }, "Marked reviewed today; next review scheduled in 180 days.")}><CalendarClock size={14} aria-hidden /> Reviewed today</button>
+                <button type="button" className="button light" onClick={() => void run(async () => { const outcome = moderateImplementation(record, "archive", reviewer, date); await actions.save("implementation_records", outcome.record); await saveAudit(outcome.audit); }, "Record archived.")}><Archive size={14} aria-hidden /> Archive</button>
               </span>
             </div>
           );
@@ -510,7 +516,7 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
             <div className="card admin-intelligence-row" key={blueprint.id}>
               <span><strong>{blueprint.name}</strong><small>Blueprint compatibility · {freshness.reasons.join(" ")}</small></span>
               <StalenessBadge state={freshness.state} />
-              <button type="button" className="button light" onClick={() => void run(async () => { await actions.save("blueprints", { ...blueprint, compatibilityState: "archived" }); await actions.save("audit_events", auditEvent(reviewer, "blueprint", blueprint.id, "blueprint-archived", date)); }, "Blueprint archived.")}><Archive size={14} aria-hidden /> Archive</button>
+              <button type="button" className="button light" onClick={() => void run(async () => { await actions.save("blueprints", { ...blueprint, compatibilityState: "archived" }); await saveAudit(auditEvent(reviewer, "blueprint", blueprint.id, "blueprint-archived", date)); }, "Blueprint archived.")}><Archive size={14} aria-hidden /> Archive</button>
             </div>
           );
         })}

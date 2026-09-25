@@ -41,6 +41,7 @@ const ImplementationWizard = lazy(
   () => import("./pages/ImplementationWizard"),
 );
 const Blueprints = lazy(() => import("./pages/Blueprints"));
+const SearchPage = lazy(() => import("./pages/Search"));
 const SolutionCompiler = lazy(() => import("./pages/SolutionCompiler"));
 const UseCaseIntelligenceDetail = lazy(
   () => import("./pages/UseCaseIntelligenceDetail"),
@@ -236,7 +237,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="verify/:token" element={<Verification />} />
                     <Route path="implementers" element={<Implementers />} />
                     <Route path="implementers/:slug" element={<Implementers />} />
-                    {["builds", "explore", "search"].map((p) => (
+                    <Route path="search" element={<SearchPage />} />
+                    {["builds", "explore"].map((p) => (
                       <Route key={p} path={p} element={<BuildDiscovery />} />
                     ))}
                     <Route path="builds/:slug" element={<BuildDetail />} />

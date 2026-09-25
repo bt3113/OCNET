@@ -7,6 +7,10 @@ export function useSearchIndex() {
   const { data: implementations = [] } = useRecords("implementation_records");
   const { data: implementationContexts = [] } = useRecords("implementation_contexts");
   const { data: blueprints = [] } = useRecords("blueprints");
+  const { data: blueprintItems = [] } = useRecords("blueprint_stack_items");
+  const { data: implementationStackItems = [] } = useRecords("implementation_stack_items");
+  const { data: implementationUseCases = [] } = useRecords("implementation_use_cases");
+  const { data: claims = [] } = useRecords("claims");
   const { data: builds = [] } = useRecords("builds");
   const { data: products = [] } = useRecords("products");
   const { data: creators = [] } = useRecords("creator_profiles");
@@ -18,7 +22,11 @@ export function useSearchIndex() {
   return searchDocuments({
     implementations,
     implementationContexts,
+    implementationStackItems,
+    implementationUseCases,
+    claims,
     blueprints,
+    blueprintItems,
     builds,
     products,
     creators,
