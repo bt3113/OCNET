@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowRight,
@@ -86,18 +86,14 @@ export default function ImplementationDetail() {
   const derivedBlueprints = blueprints.filter((blueprint) =>
     implementation.derivedBlueprintIds.includes(blueprint.id),
   );
-  const relatedImplementations = useMemo(
-    () =>
-      implementations
-        .filter(
-          (item) =>
-            item.id !== implementation.id &&
-            item.businessType !== "" &&
-            item.publicationState === "published",
-        )
-        .slice(0, 2),
-    [implementations, implementation.id],
-  );
+  const relatedImplementations = implementations
+    .filter(
+      (item) =>
+        item.id !== implementation.id &&
+        item.businessType !== "" &&
+        item.publicationState === "published",
+    )
+    .slice(0, 2);
   const implementers = integrators.filter((partner) =>
     implementation.implementerIds.includes(partner.id),
   );
