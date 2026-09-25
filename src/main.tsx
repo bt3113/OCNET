@@ -72,6 +72,7 @@ const intelligenceWorkspaceRoutes = new Set([
   "/admin/blueprints",
   "/admin/compatibility",
   "/admin/staleness",
+  "/admin/audit",
 ]);
 
 function SEO() {
@@ -234,6 +235,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="implementation/new" element={<ImplementationWizard />} />
                     <Route path="verify/:token" element={<Verification />} />
                     <Route path="implementers" element={<Implementers />} />
+                    <Route path="implementers/:slug" element={<Implementers />} />
                     {["builds", "explore", "search"].map((p) => (
                       <Route key={p} path={p} element={<BuildDiscovery />} />
                     ))}

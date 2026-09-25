@@ -1,107 +1,164 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, Check, CircleHelp, Search, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, CircleHelp, FileSearch, ListRestart, Search, SlidersHorizontal } from "lucide-react";
 import { PageHeading } from "../components/layout";
-import { Badge, ButtonLink, Skeleton } from "../components/ui";
+import { Badge, ErrorState, Skeleton } from "../components/ui";
 import {
   CompilerEmptyState,
   ContextSimilarityPanel,
+  IllustrativeNotice,
   ImplementationCard,
-  SolutionCandidateCard,
+  SectionIntro,
 } from "../components/intelligence";
-import { useActions, useRecords, useUI } from "../state";
 import {
-  compileSolutions,
-  profileFromIntent,
-  type CompiledSolution,
-} from "../data/solution-compiler";
-import type { RequirementProfile } from "../data/intelligence-model";
+  DecisionTraceDrawer,
+  RequirementBuilder,
+  SolutionCandidateCard,
+  SolutionCompilerProgress,
+  SolutionExplanationDrawer,
+  SolutionTradeoffView,
+} from "../components/compiler";
+import { useActions, useUI } from "../state";
+import { useIntelligence, isPublicRecord } from "../data/intelligence-hooks";
+import { compileSolutions, substituteComponent, type CompiledSolution } from "../data/solution-compiler";
+import { emptyProfile, profileFromIntent, validateProfile } from "../data/requirement";
+import { track } from "../data/analytics";
+import { isSupabase } from "../data/repository";
+import type { RequirementProfile, SolutionCandidate } from "../data/intelligence-model";
+
+const examples = [
+  "I run a property maintenance company with three branches. We use HubSpot. I want missed calls and web enquiries answered, qualified and booked automatically. Nobody on the team codes. Human approval for exceptions. Budget £1k–£5k setup.",
+  "Two-site salon in Manchester, about 700 enquiries a month by text and website. We want quick replies and fewer no-shows. No tech team.",
+  "Creative agency, 20 staff, EU. Qualify inbound leads into Pipedrive before a human sales review.",
+];
+
+type Order = "default" | "setup" | "maintenance" | "evidence" | "complexity";
 
 export default function SolutionCompiler() {
   const { userId, notify } = useUI();
+  const navigate = useNavigate();
   const actions = useActions();
+  const data = useIntelligence();
   const [intent, setIntent] = useState("");
   const [profile, setProfile] = useState<RequirementProfile | null>(null);
   const [result, setResult] = useState<CompiledSolution | null>(null);
+  const [explain, setExplain] = useState<SolutionCandidate | null>(null);
+  const [traceOpen, setTraceOpen] = useState(false);
+  const [showDominated, setShowDominated] = useState(false);
+  const [order, setOrder] = useState<Order>("default");
   const [saving, setSaving] = useState(false);
-  const { data: implementations = [], isLoading } = useRecords("implementation_records");
-  const { data: contexts = [] } = useRecords("implementation_contexts");
-  const { data: metrics = [] } = useRecords("implementation_metrics");
-  const { data: definitions = [] } = useRecords("metric_definitions");
-  const { data: blueprints = [] } = useRecords("blueprints");
-  const { data: blueprintVersions = [] } = useRecords("blueprint_versions");
-  const { data: blueprintItems = [] } = useRecords("blueprint_stack_items");
-  const { data: products = [] } = useRecords("products");
-  const { data: relationships = [] } = useRecords("technology_relationships");
+  const validation = profile ? validateProfile(profile) : null;
+  const serviceUseCases = data.useCases.filter((useCase) => data.blueprints.some((blueprint) => blueprint.useCaseIds.includes(useCase.id)));
 
-  const catalogue = useMemo(
-    () => ({
-      implementations,
-      contexts,
-      blueprints,
-      blueprintVersions,
-      blueprintItems,
-      products,
-      relationships,
-    }),
-    [
-      implementations,
-      contexts,
-      blueprints,
-      blueprintVersions,
-      blueprintItems,
-      products,
-      relationships,
-    ],
-  );
+  const ordered = useMemo(() => {
+    if (!result) return [];
+    const list = [...result.candidates];
+    const key: Record<Order, (c: SolutionCandidate) => number> = {
+      default: () => 0,
+      setup: (c) => c.objectives.setupCost.high ?? Number.POSITIVE_INFINITY,
+      maintenance: (c) => c.objectives.maintenanceHours.high ?? Number.POSITIVE_INFINITY,
+      evidence: (c) => -c.objectives.implementationEvidence,
+      complexity: (c) => c.objectives.complexity,
+    };
+    return list.sort((a, b) => Number(a.dominated) - Number(b.dominated) || Number(!a.feasible) - Number(!b.feasible) || key[order](a) - key[order](b));
+  }, [result, order]);
 
-  if (isLoading) return <Skeleton />;
+  if (data.isLoading) return <Skeleton />;
+  if (data.isError) return <ErrorState retry={data.refetch} />;
 
-  function structureIntent() {
+  const structure = () => {
     if (intent.trim().length < 12) {
-      notify("Describe the business outcome in a little more detail.");
+      notify("Describe the outcome in a sentence or two, or start from a blank requirement.");
       return;
     }
-    const next = profileFromIntent(intent.trim(), userId || "demo-user");
+    setProfile(profileFromIntent(intent, userId || "anonymous", `requirement-${crypto.randomUUID()}`, data.products));
+    setResult(null);
+    track("solution_compiler_started", "intent");
+  };
+  const blank = () => {
+    setProfile({ ...emptyProfile(userId || "anonymous", `requirement-${crypto.randomUUID()}`), objective: intent.trim() || "Structured requirement" });
+    setResult(null);
+    track("solution_compiler_started", "blank");
+  };
+  const update = (next: RequirementProfile) => {
     setProfile(next);
     setResult(null);
-  }
-
-  async function runCompiler() {
-    if (!profile) return;
-    const compiled = compileSolutions(profile, catalogue);
+  };
+  const compile = () => {
+    if (!profile || !validation?.ok) return;
+    const compiled = compileSolutions(profile, data.catalogue);
     setResult(compiled);
-    if (!userId) return;
+    track("compiler_run_completed", compiled.run.id);
+    requestAnimationFrame(() => document.getElementById("compiler-results")?.focus());
+  };
+  const substitute = (candidateId: string, slotId: string, productId: string) => {
+    if (!result) return;
+    setResult(substituteComponent(result, candidateId, slotId, productId, data.catalogue));
+    track("candidate_substitution", candidateId);
+  };
+  const save = async () => {
+    if (!result || !profile) return;
+    if (isSupabase && !userId) {
+      notify("Sign in to save requirement profiles and solution runs.");
+      navigate("/sign-in");
+      return;
+    }
     setSaving(true);
     try {
-      await actions.save("requirement_profiles", profile);
-      await actions.save("solution_runs", compiled.run);
-      for (const candidate of compiled.candidates)
-        await actions.save("solution_candidates", candidate);
-      for (const item of compiled.items)
-        await actions.save("solution_candidate_items", item);
-      for (const explanation of compiled.explanations)
-        await actions.save("solution_explanations", explanation);
-      notify("Solution run saved to your workspace.");
+      const owner = userId || "demo-user";
+      await actions.save("requirement_profiles", { ...profile, ownerId: owner });
+      await actions.save("solution_runs", { ...result.run, ownerId: owner, trace: result.trace });
+      for (const candidate of result.candidates) await actions.save("solution_candidates", candidate);
+      for (const item of result.items) await actions.save("solution_candidate_items", item);
+      notify(isSupabase ? "Solution run saved." : "Solution run saved in this browser (demo).");
+    } catch {
+      // useActions already surfaced the error.
     } finally {
       setSaving(false);
     }
-  }
+  };
+  const request = async (candidate: SolutionCandidate) => {
+    if (!profile) return;
+    if (isSupabase && !userId) {
+      notify("Sign in before creating a private requirement.");
+      navigate("/sign-in");
+      return;
+    }
+    const id = crypto.randomUUID();
+    const productIds = Object.values(candidate.assignment);
+    try {
+      await actions.save("projects", {
+      id,
+      name: `${profile.businessType || "Business"}: ${candidate.name}`,
+      sourceBlueprintId: candidate.sourceBlueprintId,
+      sourceImplementationId: candidate.sourceImplementationIds[0],
+      sourceStackProductIds: productIds,
+      description: `Private requirement from Solution Compiler run ${result?.run.id}. Objective: ${profile.objective}`,
+      contextSummary: [profile.businessType, profile.locations ? `${profile.locations} locations` : "", profile.region].filter(Boolean).join(" · "),
+      category: "automation",
+      budget: profile.budgetMax ? `Up to £${profile.budgetMax.toLocaleString("en-GB")} setup (buyer stated)` : "To be discussed",
+      timeline: profile.timeline || "To be discussed",
+      status: "draft",
+      capabilities: [...new Set(data.blueprintItems.filter((item) => item.id in candidate.assignment).map((item) => item.capabilityId))],
+      desiredOutcomes: [profile.objective],
+      currentSystems: profile.currentSystems,
+      provenance: isSupabase ? "community supplied" : "demo",
+      });
+    } catch {
+      return;
+    }
+    track("implementation_request_started", candidate.id);
+    notify("Private requirement created. Review it before inviting proposals.");
+    navigate(`/app/projects/${id}`);
+  };
 
-  function updateProfile<K extends keyof RequirementProfile>(
-    key: K,
-    value: RequirementProfile[K],
-  ) {
-    setProfile((current) => (current ? { ...current, [key]: value } : current));
-    setResult(null);
-  }
-
+  const shown = ordered.filter((candidate) => showDominated || !candidate.dominated || candidate.substituted);
+  const nonDominated = ordered.filter((candidate) => !candidate.dominated && candidate.feasible);
+  const publicRecords = data.implementations.filter(isPublicRecord);
   const comparable = result
-    ? implementations
-        .map((implementation) => ({
-          implementation,
-          similarity: result.similarities[implementation.id],
-        }))
-        .filter((entry) => !!entry.similarity)
+    ? publicRecords
+        .map((record) => ({ record, similarity: result.similarities[record.id] }))
+        .filter((entry) => entry.similarity && entry.similarity.level !== "low")
         .sort((a, b) => b.similarity.score - a.similarity.score)
         .slice(0, 3)
     : [];
@@ -109,214 +166,179 @@ export default function SolutionCompiler() {
   return (
     <>
       <PageHeading
-        eyebrow="ORACNET SOLUTION COMPILER · V1"
-        title="Turn an outcome into a structured solution space."
-        description="This is not a chatbot. Oracnet makes the requirement explicit, checks recorded implementations and Blueprints, applies hard constraints, and exposes trade-offs rather than inventing a single ‘best’ stack."
-        action={
-          <Badge>Deterministic engine · no model required</Badge>
-        }
+        eyebrow="SOLUTION COMPILER"
+        title="What are you trying to improve?"
+        description="Describe the outcome. Oracnet turns it into requirement cards you confirm and correct, then checks recorded implementations and Blueprints against your hard constraints and shows the trade-offs between feasible approaches."
+        action={<Badge>Deterministic · no AI model used</Badge>}
       />
 
-      <div className="compiler-shell">
-        <section className="compiler-intent card">
-          <div className="compiler-step-label"><span>1</span> Business intent</div>
-          <label className="compiler-intent-field">
-            <span>What are you trying to improve?</span>
-            <div>
-              <Search size={22} />
-              <textarea
-                value={intent}
-                onChange={(event) => setIntent(event.target.value)}
-                placeholder="Example: I run a property maintenance company with three locations. I want enquiries answered and booked faster, but my team is non-technical and must keep human approval for exceptions."
-                rows={4}
-              />
-            </div>
-          </label>
-          <div className="compiler-examples">
-            {["Automate missed enquiries for a salon", "Qualify agency leads before a sales call", "Handle after-hours reservation requests"].map((example) => (
-              <button type="button" key={example} onClick={() => setIntent(example)}>{example}</button>
-            ))}
+      <section className="compiler-intent card" aria-labelledby="intent-label">
+        <div className="compiler-step-label"><span>1</span> Describe the outcome</div>
+        <label className="compiler-intent-field" htmlFor="compiler-intent">
+          <span id="intent-label">What are you trying to improve?</span>
+          <div>
+            <Search size={20} aria-hidden />
+            <textarea
+              id="compiler-intent"
+              value={intent}
+              onChange={(event) => setIntent(event.target.value)}
+              placeholder="Example: I run a property maintenance company with three branches. We use HubSpot. I want missed calls and web enquiries answered, qualified and booked. Nobody on the team codes."
+              rows={4}
+            />
           </div>
-          <button className="button dark" type="button" onClick={structureIntent}>
-            Structure requirement <ArrowRight size={17} />
+        </label>
+        <div className="compiler-examples" aria-label="Example descriptions">
+          {examples.map((example) => (
+            <button type="button" key={example} onClick={() => setIntent(example)}>{example.split(".")[0]}</button>
+          ))}
+        </div>
+        <div className="row wrap">
+          <button className="button dark" type="button" onClick={structure}>
+            Turn into requirement cards <ArrowRight size={17} aria-hidden />
           </button>
-        </section>
+          <button className="button light" type="button" onClick={blank}>
+            Fill in the cards myself
+          </button>
+        </div>
+        <small className="muted">Text is parsed by deterministic rules in your browser. Nothing is sent to an AI provider.</small>
+      </section>
 
-        {!profile ? (
-          <CompilerEmptyState />
-        ) : (
-          <section className="compiler-requirements card">
-            <div className="compiler-step-label"><span>2</span> Review the requirement profile</div>
-            <div className="compiler-profile-grid">
-              <label>
-                Business type
-                <input value={profile.businessType} onChange={(event) => updateProfile("businessType", event.target.value)} />
-              </label>
-              <label>
-                Organization size
-                <select value={profile.organizationSizeBand} onChange={(event) => updateProfile("organizationSizeBand", event.target.value)}>
-                  <option>1–10 employees</option>
-                  <option>11–50 employees</option>
-                  <option>51–200 employees</option>
-                  <option>201+ employees</option>
-                </select>
-              </label>
-              <label>
-                Region
-                <select value={profile.region} onChange={(event) => updateProfile("region", event.target.value)}>
-                  <option>United Kingdom</option>
-                  <option>Europe</option>
-                  <option>North America</option>
-                  <option>Global</option>
-                </select>
-              </label>
-              <label>
-                Locations
-                <input type="number" min="1" max="1000" value={profile.locations ?? ""} onChange={(event) => updateProfile("locations", event.target.value ? Number(event.target.value) : null)} />
-              </label>
-              <label>
-                Monthly enquiries / transactions
-                <input type="number" min="0" value={profile.monthlyVolume ?? ""} onChange={(event) => updateProfile("monthlyVolume", event.target.value ? Number(event.target.value) : null)} placeholder="Optional" />
-              </label>
-              <label>
-                Maximum setup budget ({profile.currency})
-                <input type="number" min="0" value={profile.budgetMax ?? ""} onChange={(event) => updateProfile("budgetMax", event.target.value ? Number(event.target.value) : null)} />
-              </label>
-              <label>
-                Team technical capability
-                <select value={profile.technicalCapability} onChange={(event) => updateProfile("technicalCapability", event.target.value as RequirementProfile["technicalCapability"])}>
-                  <option value="none">None</option>
-                  <option value="basic">Basic</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </label>
-              <label>
-                Maintenance tolerance
-                <select value={profile.maintenanceTolerance} onChange={(event) => updateProfile("maintenanceTolerance", event.target.value as RequirementProfile["maintenanceTolerance"])}>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </label>
-            </div>
-            <div className="compiler-profile-wide">
-              <label>
-                Current / must-keep systems
-                <input
-                  value={profile.mustKeepSystems.join(", ")}
-                  onChange={(event) => updateProfile("mustKeepSystems", event.target.value.split(",").map((value) => value.trim()).filter(Boolean))}
-                  placeholder="Example: HubSpot, Shopify"
-                />
-                <small>These are recorded as constraints/context; unknown integration support remains visibly unknown.</small>
-              </label>
-              <label>
-                Hard required integrations
-                <input
-                  value={profile.requiredIntegrations.join(", ")}
-                  onChange={(event) => updateProfile("requiredIntegrations", event.target.value.split(",").map((value) => value.trim()).filter(Boolean))}
-                  placeholder="Only add this if the product itself must appear in the candidate architecture"
-                />
-              </label>
-            </div>
-            <label className="checkbox-label compiler-human-check">
-              <input type="checkbox" checked={profile.humanApprovalRequired} onChange={(event) => updateProfile("humanApprovalRequired", event.target.checked)} />
-              Keep a human approval / exception path
-            </label>
-            <div className="compiler-structured-preview">
-              <span><strong>Objective</strong>{profile.objective}</span>
-              <span><strong>Hard boundary</strong>{profile.budgetMax ? `Setup budget ≤ ${profile.currency} ${profile.budgetMax.toLocaleString()}` : "No budget ceiling recorded"}</span>
-              <span><strong>Operating preference</strong>{profile.maintenanceTolerance} maintenance tolerance</span>
-              <span><strong>Data sensitivity</strong>{profile.dataSensitivity}</span>
-            </div>
-            <button className="button dark" type="button" disabled={saving} onClick={() => void runCompiler().catch(() => {})}>
-              <SlidersHorizontal size={17} />
-              {saving ? "Saving run…" : "Compile feasible options"}
+      {!profile ? (
+        <CompilerEmptyState />
+      ) : (
+        <section className="compiler-requirements card" aria-labelledby="requirements-title">
+          <div className="compiler-step-label" id="requirements-title"><span>2</span> Confirm your requirement</div>
+          <p className="muted">
+            Values marked <strong>INFERRED</strong> came from your text — confirm or correct them. Mark each constraint <strong>Hard</strong> (must hold),
+            <strong> Soft</strong> (preference) or <strong>Info</strong> (context only).
+          </p>
+          <RequirementBuilder profile={profile} useCases={serviceUseCases} onChange={update} />
+          {validation && !validation.ok && (
+            <div className="notice" role="alert"><CircleHelp size={18} aria-hidden /><p>{validation.errors.join(" ")}</p></div>
+          )}
+          <div className="row wrap compiler-run-row">
+            <button className="button dark" type="button" disabled={!validation?.ok} onClick={compile}>
+              <SlidersHorizontal size={17} aria-hidden /> Compile feasible approaches
             </button>
-          </section>
-        )}
-      </div>
+            {!!profile.inferredFields?.length && (
+              <span className="muted">{profile.inferredFields.length} inferred value{profile.inferredFields.length === 1 ? "" : "s"} not yet confirmed — they are still used, marked as inferred in the run.</span>
+            )}
+          </div>
+        </section>
+      )}
 
       {result && profile && (
-        <>
-          <section className="compiler-results intelligence-section">
-            <div className="section-title-text">
-              <span className="eyebrow">3 · COMPARABLE IMPLEMENTATIONS</span>
-              <h2>Start with context before copying architecture.</h2>
-              <p>Similarity is deterministic and explanatory. It is not a prediction that your business will achieve the same observed result.</p>
-            </div>
-            <div className="compiler-comparable-grid">
-              {comparable.map(({ implementation, similarity }) => (
-                <div key={implementation.id}>
-                  <ContextSimilarityPanel similarity={similarity} />
-                  <ImplementationCard
-                    implementation={implementation}
-                    context={contexts.find((context) => context.implementationId === implementation.id)}
-                    metrics={metrics.filter((metric) => metric.implementationId === implementation.id)}
-                    metricDefinitions={definitions}
-                    similarity={similarity}
-                  />
-                </div>
-              ))}
-            </div>
+        <div id="compiler-results" tabIndex={-1} className="compiler-results-region">
+          <section className="intelligence-section">
+            <SectionIntro eyebrow="3 · WHAT THE ENGINE DID" title="Structured, reproducible steps" />
+            <SolutionCompilerProgress stages={result.stages} />
+            <IllustrativeNotice>All records, Blueprints, costs and relationships in this demo are illustrative. Use the structure, not the numbers.</IllustrativeNotice>
           </section>
 
-          <section className="compiler-results intelligence-section">
-            <div className="section-title-text">
-              <span className="eyebrow">4 · FEASIBLE SOLUTION CANDIDATES</span>
-              <h2>Multiple architectures, visible trade-offs.</h2>
-              <p>Cost, complexity, maintenance, flexibility and evidence are not collapsed into one hidden score. Dominated options stay visible when useful.</p>
+          <section className="intelligence-section">
+            <SectionIntro eyebrow="4 · COMPARABLE IMPLEMENTATIONS" title="Businesses like yours — and how they differ">
+              Similarity compares context only. It is not a prediction that you will see the same outcome.
+            </SectionIntro>
+            {comparable.length ? (
+              <div className="compiler-comparable-grid">
+                {comparable.map(({ record, similarity }) => (
+                  <div key={record.id} className="comparable-pair">
+                    <ContextSimilarityPanel similarity={similarity} />
+                    <ImplementationCard
+                      implementation={record}
+                      context={data.contexts.find((context) => context.implementationId === record.id)}
+                      metrics={data.metrics.filter((metric) => metric.implementationId === record.id)}
+                      metricDefinitions={data.definitions}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted card compiler-none">No published record has a medium or high context match. The approaches below come from Blueprints only.</p>
+            )}
+          </section>
+
+          <section className="intelligence-section">
+            <SectionIntro eyebrow="5 · FEASIBLE APPROACHES" title="Several approaches, visible trade-offs">
+              Labels appear only where recorded data supports them. There is no “best stack”. Change a component to re-check feasibility.
+            </SectionIntro>
+            <div className="compiler-toolbar card">
+              <label>
+                Order by (does not change any value)
+                <select value={order} onChange={(event) => setOrder(event.target.value as Order)}>
+                  <option value="default">Blueprint</option>
+                  <option value="setup">Lower setup cost first</option>
+                  <option value="maintenance">Lower maintenance first</option>
+                  <option value="evidence">More implementation evidence first</option>
+                  <option value="complexity">Lower complexity first</option>
+                </select>
+              </label>
+              <label className="checkbox-label">
+                <input type="checkbox" checked={showDominated} onChange={(event) => setShowDominated(event.target.checked)} />
+                Show dominated options ({ordered.filter((candidate) => candidate.dominated).length})
+              </label>
+              <button type="button" className="button light" onClick={() => setTraceOpen(true)}>
+                <FileSearch size={15} aria-hidden /> Decision trace
+              </button>
+              <button type="button" className="button light" disabled={saving} onClick={() => void save()}>
+                {saving ? "Saving…" : "Save run"}
+              </button>
             </div>
-            <div className="solution-candidate-grid">
-              {result.candidates.map((candidate) => (
-                <SolutionCandidateCard
-                  key={candidate.id}
-                  candidate={candidate}
-                  items={result.items}
-                  products={products}
-                  explanations={result.explanations}
-                />
-              ))}
-            </div>
-            {!result.candidates.length && (
-              <div className="card compiler-no-candidates">
-                <CircleHelp size={24} />
-                <h3>No candidate satisfied all hard constraints.</h3>
-                <p>Relax a hard integration or budget constraint, then compile again. Oracnet does not silently ignore a requirement to produce an answer.</p>
+            {shown.length ? (
+              <div className="solution-candidate-grid">
+                {shown.map((candidate) => (
+                  <SolutionCandidateCard
+                    key={candidate.id}
+                    candidate={candidate}
+                    items={result.items}
+                    products={data.products}
+                    implementations={data.implementations}
+                    onSubstitute={(slotId, productId) => substitute(candidate.id, slotId, productId)}
+                    onExplain={() => {
+                      setExplain(candidate);
+                      track("candidate_viewed", candidate.id);
+                    }}
+                    onRequest={() => void request(candidate)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="card compiler-no-candidates" role="status">
+                <CircleHelp size={24} aria-hidden />
+                <h3>No approach satisfies every hard constraint.</h3>
+                <p>Oracnet does not quietly drop a requirement to produce an answer. Review the exclusions below, then relax a hard constraint to Soft if that is acceptable.</p>
+                <button type="button" className="button light" onClick={() => document.getElementById("requirements-title")?.scrollIntoView({ behavior: "smooth" })}>
+                  <ListRestart size={15} aria-hidden /> Edit requirement
+                </button>
               </div>
             )}
           </section>
 
-          {!!result.run.excluded.length && (
+          {nonDominated.length > 1 && (
             <section className="intelligence-section">
-              <div className="section-title-text">
-                <span className="eyebrow">EXCLUDED CANDIDATES</span>
-                <h2>Why some architectures did not appear</h2>
-              </div>
-              <div className="excluded-candidates card">
-                {result.run.excluded.map((excluded) => (
-                  <div key={excluded.id}><ShieldCheck size={17} /><span><strong>{excluded.id}</strong>{excluded.reason}</span></div>
-                ))}
-              </div>
+              <SectionIntro eyebrow="6 · TRADE-OFFS" title="Compare the non-dominated approaches" />
+              <SolutionTradeoffView candidates={nonDominated} />
             </section>
           )}
 
-          <div className="compiler-methodology card">
-            <Sparkles size={23} />
-            <div>
-              <strong>What happened behind the interface</strong>
-              <p>Requirement profile → relevant implementation context → published Blueprints → hard constraint filtering → evidence/context analysis → multi-objective trade-off comparison.</p>
-              <small>Engine {result.run.engineVersion} · ruleset {result.run.rulesetVersion} · no external LLM used for this run.</small>
-            </div>
-            <ButtonLink to="/resources" variant="light">Read methodology <ArrowRight size={15} /></ButtonLink>
-          </div>
-        </>
-      )}
+          {!!result.trace.exclusions.length && (
+            <section className="intelligence-section">
+              <SectionIntro eyebrow="EXCLUDED" title="What did not appear, and why" />
+              <details className="card excluded-candidates">
+                <summary>{result.trace.exclusions.length} exclusion{result.trace.exclusions.length === 1 ? "" : "s"} recorded</summary>
+                <ul>
+                  {result.trace.exclusions.map((exclusion) => (
+                    <li key={exclusion.id}><strong>{data.blueprints.find((item) => item.id === exclusion.blueprintId)?.name ?? exclusion.blueprintId}</strong> — {exclusion.reason}</li>
+                  ))}
+                </ul>
+              </details>
+            </section>
+          )}
 
-      <div className="compiler-integrity-note">
-        <Check size={17} />
-        <span>AI may later help normalize natural language, but compatibility, evidence, rights and feasibility remain structured Oracnet data.</span>
-      </div>
+          <SolutionExplanationDrawer candidate={explain} products={data.products} implementations={data.implementations} onClose={() => setExplain(null)} />
+          <DecisionTraceDrawer open={traceOpen} onClose={() => setTraceOpen(false)} result={result} catalogue={data.catalogue} />
+        </div>
+      )}
     </>
   );
 }
