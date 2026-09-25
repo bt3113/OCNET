@@ -15,6 +15,7 @@ import {
   ImplementationCard,
   StalenessBadge,
 } from "../components/intelligence";
+import { isSupabase } from "../data/repository";
 import { useActions, useRecords, useUI } from "../state";
 
 export default function IntelligenceWorkspace() {
@@ -206,7 +207,10 @@ export default function IntelligenceWorkspace() {
   }
 
   const admin = path.startsWith("/admin/");
-  if (admin && !roles.includes("admin") && userId) {
+  // Demo mode intentionally exposes moderation screens so the public prototype can
+  // demonstrate the end-to-end evidence workflow. Connected Supabase mode enforces
+  // trusted reviewer/admin roles at both the UI boundary and, critically, through RLS.
+  if (admin && isSupabase && !roles.includes("admin")) {
     return <EmptyState title="Reviewer access required" description="Connected mode restricts verification operations to trusted roles." to="/" action="Back to marketplace" />;
   }
   if (path === "/admin/implementations") {
