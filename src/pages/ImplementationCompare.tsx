@@ -37,12 +37,19 @@ export default function ImplementationCompare() {
   if (isLoading) return <Skeleton />;
   if (selected.length < 2)
     return (
-      <EmptyState
-        title="Choose two or three implementations"
-        description="Comparison is contextual. Select records that solve a similar outcome, then inspect differences rather than relying on one score."
-        to="/implementations"
-        action="Choose implementations"
-      />
+      <>
+        <PageHeading
+          eyebrow="IMPLEMENTATION COMPARISON"
+          title="Compare implementation approaches in context."
+          description="Choose two or three records solving a similar outcome. Oracnet keeps context, economics, observed outcomes and evidence separate rather than producing one universal score."
+        />
+        <EmptyState
+          title="Choose two or three implementations"
+          description="Comparison is contextual. Select records that solve a similar outcome, then inspect differences rather than relying on one score."
+          to="/implementations"
+          action="Choose implementations"
+        />
+      </>
     );
 
   const contextFor = (id: string) => contexts.find((context) => context.implementationId === id);
@@ -118,82 +125,55 @@ export default function ImplementationCompare() {
           emphasis={emphasis === "context"}
         />
         <ComparisonRow
-          label="Existing systems"
-          values={selected.map((item) => contextFor(item.id)?.existingSystems.join(", ") || "Not recorded")}
-          emphasis={emphasis === "context"}
-        />
-        <ComparisonRow
           label="Implementation duration"
-          values={selected.map((item) => item.implementationDuration)}
+          values={selected.map((item) => item.implementationDuration || "Not disclosed")}
           emphasis={emphasis === "economics"}
         />
         <ComparisonRow
-          label="Illustrative setup cost"
-          values={selected.map((item) =>
-            item.implementationCost == null
-              ? "Not disclosed"
-              : `${item.implementationCostCurrency} ${item.implementationCost.toLocaleString()}`,
-          )}
+          label="Setup cost"
+          values={selected.map((item) => item.implementationCost == null ? "Not disclosed" : `${item.implementationCostCurrency} ${item.implementationCost.toLocaleString()} (illustrative)`)}
           emphasis={emphasis === "economics"}
         />
         <ComparisonRow
-          label="Illustrative monthly cost"
-          values={selected.map((item) =>
-            item.ongoingMonthlyCost == null
-              ? "Not disclosed"
-              : `${item.implementationCostCurrency} ${item.ongoingMonthlyCost.toLocaleString()}`,
-          )}
+          label="Monthly operating cost"
+          values={selected.map((item) => item.ongoingMonthlyCost == null ? "Not disclosed" : `${item.implementationCostCurrency} ${item.ongoingMonthlyCost.toLocaleString()} (illustrative)`)}
           emphasis={emphasis === "economics"}
         />
         <ComparisonRow
           label="Maintenance"
-          values={selected.map((item) =>
-            item.maintenanceHoursPerMonth == null
-              ? "Not disclosed"
-              : `${item.maintenanceHoursPerMonth} hrs/month`,
-          )}
+          values={selected.map((item) => item.maintenanceHoursPerMonth == null ? "Not disclosed" : `${item.maintenanceHoursPerMonth} hrs/month`)}
           emphasis={emphasis === "economics"}
         />
-        <div className={`comparison-row ${emphasis === "evidence" ? "comparison-emphasized" : ""}`}>
-          <div className="comparison-label">Evidence</div>
+        <div className={`comparison-row ${emphasis === "evidence" ? "comparison-emphasis" : ""}`}>
+          <div className="comparison-label">Evidence state</div>
           {selected.map((item) => (
-            <div key={item.id} className="comparison-evidence-cell">
-              <EvidenceBadge level={item.verificationState} />
-              <StalenessBadge state={item.stalenessState} />
-              <small>Last reviewed {item.lastEvidenceReviewAt}</small>
-            </div>
+            <div key={item.id}><EvidenceBadge level={item.verificationState} /><StalenessBadge state={item.stalenessState} /></div>
           ))}
         </div>
         <ComparisonRow
           label="Technology stack"
-          values={selected.map((item) => productsFor(item.id).join(" → "))}
+          values={selected.map((item) => productsFor(item.id).join(" · ") || "Not recorded")}
         />
-
         {metricIds.map((metricId) => {
-          const definition = definitions.find((candidate) => candidate.id === metricId);
+          const definition = definitions.find((item) => item.id === metricId);
           return (
-            <div
-              className={`comparison-row metric-comparison-row ${emphasis === "outcomes" ? "comparison-emphasized" : ""}`}
-              key={metricId}
-            >
+            <div className={`comparison-row metric-comparison-row ${emphasis === "outcomes" ? "comparison-emphasis" : ""}`} key={metricId}>
               <div className="comparison-label">
-                <strong>{definition?.name ?? metricId}</strong>
+                {definition?.name ?? metricId}
                 <small>{definition?.unit}</small>
               </div>
-              {selected.map((implementation) => {
-                const metric = metricFor(implementation.id, metricId);
+              {selected.map((item) => {
+                const metric = metricFor(item.id, metricId);
                 return (
-                  <div key={implementation.id}>
+                  <div key={item.id}>
                     {metric ? (
                       <>
-                        <strong>
-                          {metric.baselineValue ?? "—"} → {metric.observedValue ?? "—"} {metric.unit}
-                        </strong>
+                        <strong>{metric.baselineValue ?? "—"} → {metric.observedValue ?? "—"} {metric.unit}</strong>
                         <EvidenceBadge level={metric.evidenceLevel} compact />
-                        <small>Observed comparison; no causal attribution</small>
+                        <small>{metric.sourceLabel}</small>
                       </>
                     ) : (
-                      <span className="comparison-missing"><CircleHelp size={14} /> Not recorded</span>
+                      <span className="missing-comparison"><CircleHelp size={15} /> Not recorded / incomparable</span>
                     )}
                   </div>
                 );
@@ -202,30 +182,19 @@ export default function ImplementationCompare() {
           );
         })}
       </div>
-
-      <div className="comparison-mobile-note card">
-        <strong>On smaller screens</strong>
-        <p>Each dimension becomes a vertically stacked record so values remain readable without horizontal body overflow.</p>
+      <div className="comparison-note notice">
+        <CircleHelp size={18} />
+        <p>These records are synthetic demonstrations. Even with real records, an observed result in one operating context should not be treated as a forecast for another business.</p>
       </div>
     </>
   );
 }
 
-function ComparisonRow({
-  label,
-  values,
-  emphasis = false,
-}: {
-  label: string;
-  values: string[];
-  emphasis?: boolean;
-}) {
+function ComparisonRow({ label, values, emphasis = false }: { label: string; values: string[]; emphasis?: boolean }) {
   return (
-    <div className={`comparison-row ${emphasis ? "comparison-emphasized" : ""}`}>
+    <div className={`comparison-row ${emphasis ? "comparison-emphasis" : ""}`}>
       <div className="comparison-label">{label}</div>
-      {values.map((value, index) => (
-        <div key={`${label}-${index}`}>{value || "Not recorded"}</div>
-      ))}
+      {values.map((value, index) => <div key={`${label}-${index}`}>{value || "Not disclosed"}</div>)}
     </div>
   );
 }
