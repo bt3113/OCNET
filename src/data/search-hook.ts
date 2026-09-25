@@ -1,21 +1,29 @@
 import { useRecords } from "../state";
 import { useQuery } from "@tanstack/react-query";
 import { isSupabase } from "./repository";
-import { searchIndex, type SearchDocument } from "./search";
-import { searchDocuments } from "./search";
+import { searchIndex, searchDocuments, type SearchDocument } from "./search";
+
 export function useSearchIndex() {
+  const { data: implementations = [] } = useRecords("implementation_records");
+  const { data: implementationContexts = [] } = useRecords("implementation_contexts");
+  const { data: blueprints = [] } = useRecords("blueprints");
   const { data: builds = [] } = useRecords("builds");
   const { data: products = [] } = useRecords("products");
   const { data: creators = [] } = useRecords("creator_profiles");
   const { data: providers = [] } = useRecords("providers");
+  const { data: implementers = [] } = useRecords("integrators");
   const { data: cases = [] } = useRecords("use_cases");
   const { data: stacks = [] } = useRecords("solution_stacks");
   const { data: articles = [] } = useRecords("articles");
   return searchDocuments({
+    implementations,
+    implementationContexts,
+    blueprints,
     builds,
     products,
     creators,
     providers,
+    implementers,
     cases,
     stacks,
     articles,
