@@ -33,3 +33,18 @@ Official references: https://supabase.com/docs/guides/database/postgres/row-leve
 - Marketplace fraud: offers and questions enter moderation; reports/claims have private access. No live transaction or claim of escrow/security verification is implied.
 
 Provisioned Supabase, OAuth, storage signing, gateway behavior and Realtime still require staging acceptance. The checked-in PostgreSQL tests verify migrations/RLS/RPCs locally; they do not claim a deployed backend. The optional vector migration requires pgvector in the public schema; provision/reconcile extension placement before applying to an existing database.
+
+## Implementation intelligence controls
+
+Audited against migration `202609250001` and fixed in `202609250003` (all covered by `tests/security/intelligence-rls.test.ts` on PostgreSQL):
+
+- **Claim IDOR / forgery** — claims require an editable subject; retargeting is rejected by row-based `WITH CHECK`; only accepted, public claims on public subjects are readable anonymously; material edits reset status and evidence level.
+- **Self-verification** — triggers force `pending`/`creator-reported` on insert, keep trusted fields (verification, freshness, provenance, demo) on update, and send approved records/Blueprints back to moderation after material or child edits. Owners can never approve.
+- **Attestation forgery** — browsers cannot insert or complete attestations; `create_attestation`/`apply_attestation` are executable only by the service role, check ownership and claim scope, lock the row, enforce single use and expiry, and delete the contact email. Tokens are stored as SHA-256 hashes; lookups return a uniform error.
+- **Evidence** — artifacts can only point into the owner’s storage prefix and use allowed MIME types; attaching evidence requires owning both the artifact and the claim subject; uploads use server-chosen names via signed URLs, content is sniffed (magic bytes, UTF-8 without active markup) and mismatches are deleted; downloads are 60-second signed URLs for the owner or reviewers.
+- **History** — audit, review and verification events are append-only, including for the service role; audit rows record changed field names, not values (except state fields).
+- **Cross-tenant references** — runs must reference the caller’s own requirement profile; derived Blueprints must come from the owner’s record; `derivedBlueprintIds` must be the owner’s Blueprints.
+- **Private data in search/SEO** — search views, sitemap and prerendered metadata include only published, approved, public rows; private customer names are stored in a separate owner/admin table and never in public fields.
+- **Sanitization** — Blueprint derivation requires a confirmed checklist and no blocking scanner findings; scanning is assistance, not a guarantee.
+
+Accepted residual risks: helper functions such as `implementation_is_public` are executable by `anon` (needed by policies) and reveal only a boolean about public status; relationship submissions accept external URLs that are never fetched server-side and are rendered with `rel="noopener noreferrer nofollow"`; admin deletion of a claim with reviews is blocked by the append-only history (revoke instead). The RRF hybrid function is SQL-reviewed but not executed locally (no pgvector in PGlite). Edge Functions are type-checked only by Deno at deploy time and have not run against a provisioned project.

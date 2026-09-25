@@ -28,3 +28,11 @@ Use a host with request headers, server functions, route rewrites, structured ob
 Apply both `202609240001_build_graph.sql` and `202609240002_search.sql` after the original migration. Ensure pgvector is installed in the public schema expected by the search migration. Re-run `seed.sql`; use optional `seed-builds.sql` with explicitly selected staging Auth UUIDs. Deploy `import-public` with server-side environment configuration described in [Build marketplace](build-marketplace.md). Enable GitHub in Supabase Auth and configure the Supabase callback in the GitHub OAuth application; allow the deployed `/creator` redirect.
 
 Pages always builds demo mode. No Supabase credential, GitHub token, embedding key or gateway secret is required for this deployment. New seeded Build/creator URLs receive static metadata; dynamically published demo records exist only in that browser and use the SPA fallback.
+
+## Implementation intelligence release
+
+Apply `202609250001_implementation_intelligence.sql`, `202609250002_intelligence_search.sql`, `202609250003_intelligence_hardening.sql` and (with pgvector) `202609250004_hybrid_search_rrf.sql` in order. Migration 0003 drops the legacy pseudo-score columns from `solution_candidates` (derived, reproducible data only).
+
+Deploy Edge Functions `attestation` and `evidence` with secrets `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ORIGIN`, `APP_BASE_PATH` (e.g. `/OCNET`), and for invitations `RESEND_API_KEY` + `EMAIL_FROM`. Without the email secrets, invitation creation fails closed with 503 and creates nothing. Schedule a job to purge `attestation_contacts` past `deleteAfter`.
+
+The Pages build stays demo-only. `postbuild.mjs` prerenders metadata only for published, approved, public records and Blueprints and adds implementer profiles; drafts never reach the sitemap.

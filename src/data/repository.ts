@@ -1,5 +1,12 @@
 import type { Table, Tables } from "./model";
 import { buildProducts, buildProviders } from "./build-seed";
+import {
+  intelligenceProducts,
+  intelligenceProviders,
+  intelligenceSeed,
+  intelligenceStacks,
+  intelligenceUseCases,
+} from "./intelligence-seed";
 import { seed } from "./seed";
 export interface Repository {
   list<K extends Table>(table: K): Promise<Tables[K][]>;
@@ -8,19 +15,27 @@ export interface Repository {
   subscribe(table: Table, callback: () => void): () => void;
 }
 const key = "oracnet:v1:";
+/** Intelligence tables use their own namespace so seed revisions do not mix with older browser data. */
+const intelligenceKey = "oracnet:intel-v2:";
+const storageKey = (table: Table) => (table in intelligenceSeed ? intelligenceKey : key) + table;
 export class DemoRepository implements Repository {
   private read<K extends Table>(table: K): Tables[K][] {
-    const raw = localStorage.getItem(key + table);
-    if (!raw) return structuredClone((seed[table] ?? []) as Tables[K][]);
+    const raw = localStorage.getItem(storageKey(table));
+    const base = (seed[table] ?? intelligenceSeed[table] ?? []) as Tables[K][];
+    if (!raw) return structuredClone(base);
     try {
       const parsed: unknown = JSON.parse(raw);
       if (!Array.isArray(parsed)) throw Error();
-      const additions =
+      const additions: { id: string }[] =
         table === "products"
-          ? buildProducts
+          ? [...buildProducts, ...intelligenceProducts]
           : table === "providers"
-            ? buildProviders
-            : [];
+            ? [...buildProviders, ...intelligenceProviders]
+            : table === "use_cases"
+              ? intelligenceUseCases
+              : table === "solution_stacks"
+                ? intelligenceStacks
+                : [];
       return [
         ...parsed,
         ...additions.filter((x) => !parsed.some((v) => v.id === x.id)),
@@ -38,13 +53,13 @@ export class DemoRepository implements Repository {
     const values = this.read(table);
     const next = values.filter((x) => x.id !== value.id);
     next.push(value);
-    localStorage.setItem(key + table, JSON.stringify(next));
+    localStorage.setItem(storageKey(table), JSON.stringify(next));
     window.dispatchEvent(new Event("oracnet-change"));
     return value;
   }
   async remove(table: Table, id: string) {
     localStorage.setItem(
-      key + table,
+      storageKey(table),
       JSON.stringify(this.read(table).filter((x) => x.id !== id)),
     );
     window.dispatchEvent(new Event("oracnet-change"));

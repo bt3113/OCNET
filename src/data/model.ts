@@ -1,6 +1,12 @@
 import type { BuildTables } from "./build-model";
+import type { IntelligenceTables } from "./intelligence-model";
 export type Role =
-  "creator" | "buyer" | "provider" | "integrator" | "consultant" | "admin";
+  | "creator"
+  | "buyer"
+  | "provider"
+  | "integrator"
+  | "consultant"
+  | "admin";
 export type Provenance =
   | "verified"
   | "vendor supplied"
@@ -56,6 +62,18 @@ export interface Product extends RecordBase {
   integrations: string[];
   color: string;
   initials: string;
+  /** Lifecycle as last recorded; drives Blueprint staleness. Missing = unknown. */
+  lifecycleState?: "active" | "deprecated" | "retired";
+  /** Regions where availability has been recorded. Missing = unknown, never assumed. */
+  availableRegions?: string[];
+  /** Deployment models recorded for the product, e.g. "cloud", "self-hosted". */
+  deploymentOptions?: string[];
+  /** Data-residency options recorded for the product, e.g. "EU", "UK", "US". */
+  dataResidencyOptions?: string[];
+  /** Skill recorded for day-to-day administration (not initial setup). */
+  operatorSkill?: "no-code" | "low-code" | "developer";
+  /** Provenance of the attributes above when they differ from the record provenance. */
+  attributeSource?: string;
 }
 export interface ProductMedia extends RecordBase {
   productId: string;
@@ -111,6 +129,8 @@ export interface Update extends RecordBase {
 export type Article = Update;
 export interface Project extends RecordBase {
   sourceBuildId?: string;
+  sourceImplementationId?: string;
+  sourceBlueprintId?: string;
   sourceStackProductIds?: string[];
   description: string;
   category: string;
@@ -118,6 +138,9 @@ export interface Project extends RecordBase {
   timeline: string;
   status: "draft" | "open" | "awarded" | "closed";
   capabilities: string[];
+  desiredOutcomes?: string[];
+  currentSystems?: string[];
+  contextSummary?: string;
 }
 export interface Proposal extends RecordBase {
   projectId: string;
@@ -125,6 +148,14 @@ export interface Proposal extends RecordBase {
   description: string;
   estimate: string;
   status: "submitted" | "shortlisted" | "accepted" | "declined";
+  proposedArchitecture?: string;
+  technologyIds?: string[];
+  substitutions?: string[];
+  implementationTimeline?: string;
+  ongoingService?: string;
+  assumptions?: string[];
+  dependencies?: string[];
+  evidenceImplementationIds?: string[];
 }
 export interface SavedItem extends RecordBase {
   ownerId?: string;
@@ -183,7 +214,7 @@ export interface WorkspaceRecord extends RecordBase {
   status?: string;
   [key: string]: unknown;
 }
-export interface Tables extends BuildTables {
+export interface Tables extends BuildTables, IntelligenceTables {
   users: User;
   organizations: Organization;
   providers: Provider;
