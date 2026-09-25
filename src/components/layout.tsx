@@ -12,7 +12,6 @@ import {
   Search,
   LayoutGrid,
   Cpu,
-  Bot,
   Users,
   ShoppingBag,
   BookOpen,
@@ -31,6 +30,9 @@ import {
   Building2,
   ChevronDown,
   X,
+  GitBranch,
+  Layers3,
+  Sparkles,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRecords, useUI } from "../state";
@@ -39,28 +41,34 @@ const ProviderContactModal = lazy(() =>
   import("./forms").then((m) => ({ default: m.ProviderContactModal })),
 );
 import { isSupabase } from "../data/repository";
+
 const mainLinks = [
   ["/", "Home", Home],
-  ["/builds", "Builds", LayoutGrid],
   ["/explore", "Explore", Search],
-  ["/creators", "Creators", Users],
-  ["/use-cases", "Use Cases", LayoutGrid],
-  ["/technologies?category=ai-software", "AI Tools & Models", Cpu],
-  ["/technologies?category=robotics-hardware", "Robotics & Hardware", Bot],
-  ["/integrators", "Integrators & Consultants", Users],
+  ["/implementations", "Implementations", LayoutGrid],
+  ["/blueprints", "Blueprints", Layers3],
+  ["/use-cases", "Use Cases", GitBranch],
+  ["/technologies", "Technologies", Cpu],
+  ["/providers", "Providers", Building2],
+  ["/implementers", "Implementers", Users],
+  ["/builds", "Builds", LayoutGrid],
   ["/marketplace", "Marketplace", ShoppingBag],
   ["/resources", "Resources", BookOpen],
 ] as const;
 const buyerLinks = [
-  ["/app/messages", "Messages", MessageSquare],
   ["/app/saved", "Saved", Bookmark],
   ["/collections", "Collections", Folder],
+  ["/app/requirements", "Requirements", GitBranch],
+  ["/app/solution-runs", "Solution Runs", Sparkles],
   ["/app/projects", "My Projects", Folder],
+  ["/app/messages", "Messages", MessageSquare],
   ["/compare", "Compare", Scale],
 ] as const;
 const providerSections = [
   "Overview",
   "Company",
+  "Implementations",
+  "Compatibility",
   "Builds",
   "Claims",
   "Listings",
@@ -76,8 +84,11 @@ const providerSections = [
 ];
 const creatorSections = [
   "Overview",
+  "Implementations",
+  "Blueprints",
   "Builds",
   "Offers",
+  "Requests",
   "Messages",
   "Analytics",
   "Profile",
@@ -85,11 +96,17 @@ const creatorSections = [
 ];
 const adminSections = [
   "Overview",
+  "Implementations",
+  "Claims",
+  "Evidence",
+  "Attestations",
+  "Blueprints",
+  "Compatibility",
+  "Staleness",
   "Builds",
   "Creators",
   "Offers",
   "Reports",
-  "Claims",
   "Users",
   "Providers",
   "Listings",
@@ -102,6 +119,7 @@ const adminSections = [
   "Verification",
   "Moderation",
 ];
+
 export function AppSidebar({ close }: { close: () => void }) {
   const location = useLocation();
   const { roles, userName } = useUI();
@@ -123,7 +141,7 @@ export function AppSidebar({ close }: { close: () => void }) {
       <nav aria-label="Main navigation">
         {workspace ? (
           <>
-            <Link className="back-nav" to="/explore" onClick={close}>
+            <Link className="back-nav" to="/implementations" onClick={close}>
               ← Back to marketplace
             </Link>
             <p className="nav-caption">{workspace} workspace</p>
@@ -132,25 +150,27 @@ export function AppSidebar({ close }: { close: () => void }) {
               : workspace === "creator"
                 ? creatorSections
                 : adminSections
-            ).map((s, i) => (
+            ).map((section, index) => (
               <NavLink
                 end
-                key={s}
+                key={section}
                 to={
                   "/" +
                   workspace +
-                  (i ? "/" + s.toLowerCase().replaceAll(" ", "-") : "")
+                  (index
+                    ? "/" + section.toLowerCase().replaceAll(" ", "-")
+                    : "")
                 }
                 onClick={close}
               >
                 <span className="nav-dot" />
-                {s}
+                {section}
               </NavLink>
             ))}
           </>
         ) : (
           <>
-            {mainLinks.map(([to, label, I]) => (
+            {mainLinks.map(([to, label, Icon]) => (
               <NavLink
                 end
                 key={label}
@@ -165,14 +185,14 @@ export function AppSidebar({ close }: { close: () => void }) {
                     : ""
                 }
               >
-                <I size={19} strokeWidth={1.65} />
+                <Icon size={19} strokeWidth={1.65} />
                 {label}
               </NavLink>
             ))}
             <div className="nav-divider" />
-            {buyerLinks.map(([to, label, I]) => (
+            {buyerLinks.map(([to, label, Icon]) => (
               <NavLink key={label} to={to} onClick={close}>
-                <I size={19} strokeWidth={1.65} />
+                <Icon size={19} strokeWidth={1.65} />
                 {label}
               </NavLink>
             ))}
@@ -196,13 +216,13 @@ export function AppSidebar({ close }: { close: () => void }) {
           <HelpCircle size={19} />
           Help & Support
         </NavLink>
-        <Link className="sidebar-promo" to="/how-it-works" onClick={close}>
+        <Link className="sidebar-promo" to="/solution-compiler" onClick={close}>
           <strong>
-            Build smarter
+            Start with the
             <br />
-            with Oracnet
+            business outcome
           </strong>
-          <p>The technology marketplace for what you want to build.</p>
+          <p>Structure the problem, compare evidence, then choose the technology.</p>
           <ArrowRight size={20} />
         </Link>
         <div className="workspace-links">
@@ -217,6 +237,7 @@ export function AppSidebar({ close }: { close: () => void }) {
     </>
   );
 }
+
 export function MobileNavigation({ onMenu }: { onMenu: () => void }) {
   return (
     <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -224,17 +245,17 @@ export function MobileNavigation({ onMenu }: { onMenu: () => void }) {
         <Search size={21} />
         Explore
       </NavLink>
+      <NavLink to="/implementations">
+        <LayoutGrid size={21} />
+        Evidence
+      </NavLink>
+      <NavLink to="/solution-compiler" className="mobile-publish">
+        <Sparkles size={21} />
+        Compile
+      </NavLink>
       <NavLink to="/app/saved">
         <Bookmark size={21} />
         Saved
-      </NavLink>
-      <NavLink to="/creator/builds/new" className="mobile-publish">
-        <Plus size={21} />
-        Publish
-      </NavLink>
-      <NavLink to="/app/projects">
-        <Folder size={21} />
-        Projects
       </NavLink>
       <button onClick={onMenu}>
         <Menu size={21} />
@@ -243,39 +264,42 @@ export function MobileNavigation({ onMenu }: { onMenu: () => void }) {
     </nav>
   );
 }
+
 export function GlobalSearch() {
   const { setCommand } = useUI();
   return (
     <button className="global-search" onClick={() => setCommand(true)}>
       <Search size={19} />
-      <span>Search builds, technologies, use cases, or creators…</span>
+      <span>Search implementations, Blueprints, use cases, technologies…</span>
       <kbd>⌘ K</kbd>
     </button>
   );
 }
+
 export function CommandPalette() {
   const { command, setCommand } = useUI();
   const [q, setQ] = useState("");
   const navigate = useNavigate();
   const search = useMarketplaceSearch(q);
   const [active, setActive] = useState(-1);
-  const results = search.data.slice(0, 7);
+  const results = search.data.slice(0, 8);
   const jumps = [
-    { name: "Publish a build", path: "/creator/builds/new" },
+    { name: "Solution Compiler", path: "/solution-compiler" },
+    { name: "Add implementation record", path: "/implementation/new" },
+    { name: "Explore Blueprints", path: "/blueprints" },
     { name: "Your saved items", path: "/app/saved" },
-    { name: "Compare", path: "/compare" },
-    { name: "Creator workspace", path: "/creator" },
+    { name: "Requirement profiles", path: "/app/requirements" },
   ];
   const options = [
     ...results,
     ...jumps.filter(
-      (j) => !q || j.name.toLowerCase().includes(q.toLowerCase()),
+      (jump) => !q || jump.name.toLowerCase().includes(q.toLowerCase()),
     ),
   ];
   useEffect(() => {
-    function key(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
+    function key(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+        event.preventDefault();
         setCommand(!command);
       }
     }
@@ -286,13 +310,13 @@ export function CommandPalette() {
     <Modal
       open={command}
       onClose={() => setCommand(false)}
-      title="What do you want to build?"
-      description="Search builds, use cases, technologies and creators. Arrow keys choose; Enter opens."
+      title="Search Oracnet"
+      description="Search implementation evidence, Blueprints, Builds, use cases, technologies and people."
     >
       <form
         className="command-input"
-        onSubmit={(e) => {
-          e.preventDefault();
+        onSubmit={(event) => {
+          event.preventDefault();
           setCommand(false);
           navigate(
             active >= 0 && options[active]
@@ -305,10 +329,10 @@ export function CommandPalette() {
         <input
           autoFocus
           aria-label="Search marketplace"
-          placeholder="Try ‘video’, ‘automation’, or ‘OpenAI’"
+          placeholder="Try ‘missed enquiries’, ‘Twilio’, or ‘booking’"
           value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
+          onChange={(event) => {
+            setQ(event.target.value);
             setActive(-1);
           }}
           role="combobox"
@@ -318,11 +342,14 @@ export function CommandPalette() {
           aria-activedescendant={
             active >= 0 ? "command-option-" + active : undefined
           }
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-              e.preventDefault();
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              if (!options.length) return;
               setActive(
-                (active + (e.key === "ArrowDown" ? 1 : -1) + options.length) %
+                (active +
+                  (event.key === "ArrowDown" ? 1 : -1) +
+                  options.length) %
                   options.length,
               );
             }
@@ -338,25 +365,25 @@ export function CommandPalette() {
         role="listbox"
         aria-label="Search suggestions"
       >
-        {options.map((r, i) => (
+        {options.map((result, index) => (
           <div
-            key={r.path}
-            id={"command-option-" + i}
+            key={result.path}
+            id={"command-option-" + index}
             role="option"
-            aria-selected={active === i}
-            className={active === i ? "command-active" : ""}
+            aria-selected={active === index}
+            className={active === index ? "command-active" : ""}
           >
-            <Link to={r.path} onClick={() => setCommand(false)}>
+            <Link to={result.path} onClick={() => setCommand(false)}>
               <span className="category-icon sand">
                 <Search size={18} />
               </span>
               <span>
-                <strong>{r.name}</strong>
+                <strong>{result.name}</strong>
                 <small>
-                  {"type" in r
-                    ? String(r.type) +
+                  {"type" in result
+                    ? String(result.type) +
                       " · " +
-                      ("provenance" in r ? r.provenance : "")
+                      ("provenance" in result ? result.provenance : "")
                     : "Jump to page"}
                 </small>
               </span>
@@ -370,14 +397,15 @@ export function CommandPalette() {
         {results.length} search suggestions
       </span>
       <div className="command-foot">
-        <Command size={14} /> Search the ecosystem <span>Esc to close</span>
+        <Command size={14} /> Search the evidence graph <span>Esc to close</span>
       </div>
     </Modal>
   );
 }
+
 export function CompareTray() {
   const { data = [] } = useRecords("comparisons");
-  const ids = data.find((x) => x.id === "current")?.productIds ?? [];
+  const ids = data.find((item) => item.id === "current")?.productIds ?? [];
   const location = useLocation();
   return (
     <AnimatePresence>
@@ -401,6 +429,7 @@ export function CompareTray() {
     </AnimatePresence>
   );
 }
+
 export function Layout() {
   const { contact } = useUI();
   const [menu, setMenu] = useState(false);
@@ -436,11 +465,11 @@ export function Layout() {
               aria-label="Notifications"
             >
               <Bell size={20} />
-              {notifications.some((n) => !n.read) && <i />}
+              {notifications.some((notification) => !notification.read) && <i />}
             </Link>
-            <ButtonLink to="/creator/builds/new" variant="gold">
+            <ButtonLink to="/implementation/new" variant="gold">
               <Plus size={18} />
-              <span>Publish a Build</span>
+              <span>Add Implementation</span>
             </ButtonLink>
             <button
               className="avatar account-button"
@@ -458,7 +487,7 @@ export function Layout() {
         </main>
         <footer>
           <Link className="brand footer-brand" to="/">
-            Oracnet<span>Build tomorrow, today.</span>
+            Oracnet<span>Implementation intelligence, connected.</span>
           </Link>
           <div>
             {[
@@ -475,16 +504,16 @@ export function Layout() {
               "privacy",
               "cookies",
               "marketplace-terms",
-            ].map((p) => (
-              <Link key={p} to={"/" + p}>
-                {p.replaceAll("-", " ")}
+            ].map((page) => (
+              <Link key={page} to={"/" + page}>
+                {page.replaceAll("-", " ")}
               </Link>
             ))}
           </div>
           <small>
             {isSupabase
               ? "Connected workspace"
-              : "Interactive demo · sample marketplace content · no live payments"}{" "}
+              : "Interactive demo · synthetic implementation records · no live payments"}{" "}
             · © {new Date().getFullYear()} Oracnet
           </small>
         </footer>
@@ -494,7 +523,7 @@ export function Layout() {
         open={menu}
         onClose={() => setMenu(false)}
         title="Explore Oracnet"
-        description="Marketplace and workspace navigation"
+        description="Implementation intelligence, marketplace and workspace navigation"
       >
         <div className="mobile-sidebar">
           <AppSidebar close={() => setMenu(false)} />
@@ -508,7 +537,7 @@ export function Layout() {
       >
         <div className="account-links">
           {[
-            ["/creator", "Creator workspace"],
+            ["/creator", "Creator / implementer workspace"],
             ["/app", "Buyer workspace"],
             ["/provider", "Provider workspace"],
             ["/app/profile", "Profile"],
@@ -532,6 +561,7 @@ export function Layout() {
     </>
   );
 }
+
 export function PageHeading({
   eyebrow,
   title,
@@ -554,13 +584,14 @@ export function PageHeading({
     </div>
   );
 }
+
 export function WorkspaceNotice() {
   return (
     <div className="workspace-notice">
       <ShieldCheck size={17} />
       {isSupabase
         ? "Connected workspace — permissions enforced by Supabase"
-        : "Demo workspace — actions stay in this browser. No external messages or payments."}
+        : "Demo workspace — actions stay in this browser. No external messages, attestations or payments."}
       <Link to="/app/settings">Manage data</Link>
     </div>
   );
