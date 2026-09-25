@@ -6,7 +6,6 @@ import {
   GitBranch,
   SearchCheck,
   ShieldCheck,
-  Wrench,
 } from "lucide-react";
 import { PageHeading, WorkspaceNotice } from "../components/layout";
 import { Badge, ButtonLink, EmptyState, Skeleton } from "../components/ui";
