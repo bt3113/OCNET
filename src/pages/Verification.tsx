@@ -58,19 +58,21 @@ export default function Verification() {
       />
     );
   }
+  const activeAttestation = attestation;
 
   const implementation = implementations.find(
-    (item) => item.id === attestation.implementationId,
+    (item) => item.id === activeAttestation.implementationId,
   );
   if (!implementation) {
     return <EmptyState title="Implementation record unavailable" />;
   }
+  const activeImplementation = implementation;
   const metricIds = metrics
-    .filter((metric) => metric.implementationId === implementation.id)
+    .filter((metric) => metric.implementationId === activeImplementation.id)
     .map((metric) => metric.id);
   const reviewableClaims = claims.filter(
     (claim) =>
-      claim.subjectId === implementation.id || metricIds.includes(claim.subjectId),
+      claim.subjectId === activeImplementation.id || metricIds.includes(claim.subjectId),
   );
   const decidedCount = reviewableClaims.filter(
     (claim) => decisions[claim.id] && decisions[claim.id] !== "skip",
@@ -104,12 +106,12 @@ export default function Verification() {
         });
       }
       await actions.save("attestations", {
-        ...attestation,
+        ...activeAttestation,
         status: "submitted",
         customerIdentityVisibility: identityVisibility,
       });
       notify("Demo attestation submitted. No external email or real customer verification occurred.");
-      navigate(`/implementations/${implementation.slug}`);
+      navigate(`/implementations/${activeImplementation.slug}`);
     } finally {
       setSubmitting(false);
     }
@@ -147,9 +149,9 @@ export default function Verification() {
       </div>
       <div className="verification-record card">
         <small>Implementation record</small>
-        <strong>{implementation.name}</strong>
-        <p>{implementation.contextSummary}</p>
-        <EvidenceBadge level={implementation.verificationState} />
+        <strong>{activeImplementation.name}</strong>
+        <p>{activeImplementation.contextSummary}</p>
+        <EvidenceBadge level={activeImplementation.verificationState} />
       </div>
       <section className="attestation-claims">
         <div className="section-title-text">
