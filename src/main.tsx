@@ -16,6 +16,7 @@ import {
   buildProviderRoutes,
 } from "./routes";
 import "./styles.css";
+import "./intelligence.css";
 const BuildDiscovery = lazy(() => import("./pages/BuildDiscovery"));
 const BuildDetail = lazy(() => import("./pages/BuildDetail"));
 const Creators = lazy(() => import("./pages/Creators"));
@@ -29,25 +30,67 @@ const Workspace = lazy(() => import("./pages/Workspace"));
 const Compare = lazy(() => import("./pages/Compare"));
 const Content = lazy(() => import("./pages/Content"));
 const Auth = lazy(() => import("./pages/Auth"));
+const ImplementationDiscovery = lazy(
+  () => import("./pages/ImplementationDiscovery"),
+);
+const ImplementationDetail = lazy(() => import("./pages/ImplementationDetail"));
+const ImplementationCompare = lazy(
+  () => import("./pages/ImplementationCompare"),
+);
+const ImplementationWizard = lazy(
+  () => import("./pages/ImplementationWizard"),
+);
+const Blueprints = lazy(() => import("./pages/Blueprints"));
+const SolutionCompiler = lazy(() => import("./pages/SolutionCompiler"));
+const UseCaseIntelligenceDetail = lazy(
+  () => import("./pages/UseCaseIntelligenceDetail"),
+);
+const TechnologyIntelligenceDetail = lazy(
+  () => import("./pages/TechnologyIntelligenceDetail"),
+);
+const Implementers = lazy(() => import("./pages/Implementers"));
+const Verification = lazy(() => import("./pages/Verification"));
+const IntelligenceWorkspace = lazy(
+  () => import("./pages/IntelligenceWorkspace"),
+);
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30000, retry: 1 } },
 });
+
+const intelligenceWorkspaceRoutes = new Set([
+  "/creator/implementations",
+  "/creator/blueprints",
+  "/creator/requests",
+  "/app/requirements",
+  "/app/solution-runs",
+  "/provider/implementations",
+  "/provider/compatibility",
+  "/admin/implementations",
+  "/admin/claims",
+  "/admin/evidence",
+  "/admin/attestations",
+  "/admin/blueprints",
+  "/admin/compatibility",
+  "/admin/staleness",
+]);
+
 function SEO() {
   const location = useLocation();
   useEffect(() => {
     const path = location.pathname;
     const name =
       path === "/"
-        ? "Find the right technology for what you want to build"
+        ? "Implementation intelligence for what you want to improve"
         : decodeURIComponent(
             path.split("/").filter(Boolean).at(-1) ?? "Discover",
           ).replaceAll("-", " ");
     document.title =
       name.charAt(0).toUpperCase() + name.slice(1) + " | Oracnet";
-    const description =
-      "Explore " +
-      name +
-      " on Oracnet. Discover technologies and expert partners around your business outcome.";
+    const description = path.startsWith("/implementations/")
+      ? `Explore the implementation context, architecture, evidence and reusable options for ${name} on Oracnet.`
+      : path.startsWith("/blueprints/")
+        ? `Explore the sanitized, versioned reference Blueprint ${name} on Oracnet.`
+        : "Explore implementation evidence, reusable Blueprints, technologies and qualified partners around a business outcome on Oracnet.";
     const canonical =
       "https://bt3113.github.io/OCNET" + (path === "/" ? "/" : path);
     let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
@@ -58,7 +101,7 @@ function SEO() {
     }
     link.href = canonical;
     for (const [key, value] of Object.entries({
-      description: description,
+      description,
       "og:title": document.title,
       "og:description": description,
       "og:url": canonical,
@@ -68,7 +111,7 @@ function SEO() {
       "twitter:title": document.title,
       "twitter:description": description,
       robots:
-        /^\/(app|creator\b|collections\b|provider\b|admin|sign-in|sign-up|forgot-password|onboarding)/.test(
+        /^\/(app|creator\b|collections\b|provider\b|admin|verify\b|implementation\/new|sign-in|sign-up|forgot-password|onboarding)/.test(
           path,
         )
           ? "noindex,nofollow"
@@ -119,8 +162,18 @@ function SEO() {
                 "@type": "SoftwareApplication",
                 name,
                 description:
-                  "Demo marketplace listing. Confirm details with the provider.",
+                  "Marketplace component profile. Confirm current product details with the provider.",
                 applicationCategory: "BusinessApplication",
+                url: canonical,
+              },
+            ]
+          : []),
+        ...(path.startsWith("/implementations/")
+          ? [
+              {
+                "@type": "CaseStudy",
+                name,
+                description,
                 url: canonical,
               },
             ]
@@ -172,6 +225,15 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Routes>
                   <Route element={<Layout />}>
                     <Route index element={<Home />} />
+                    <Route path="implementations" element={<ImplementationDiscovery />} />
+                    <Route path="implementations/:slug" element={<ImplementationDetail />} />
+                    <Route path="compare/implementations" element={<ImplementationCompare />} />
+                    <Route path="blueprints" element={<Blueprints />} />
+                    <Route path="blueprints/:slug" element={<Blueprints />} />
+                    <Route path="solution-compiler" element={<SolutionCompiler />} />
+                    <Route path="implementation/new" element={<ImplementationWizard />} />
+                    <Route path="verify/:token" element={<Verification />} />
+                    <Route path="implementers" element={<Implementers />} />
                     {["builds", "explore", "search"].map((p) => (
                       <Route key={p} path={p} element={<BuildDiscovery />} />
                     ))}
@@ -180,21 +242,21 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="creators/:slug" element={<Creators />} />
                     <Route path="collections" element={<Collections />} />
                     <Route path="collections/:slug" element={<Collections />} />
-                    <Route
-                      path="creator/builds/new"
-                      element={<BuildWizard />}
-                    />
-                    <Route
-                      path="creator/builds/:id/edit"
-                      element={<BuildWizard />}
-                    />
+                    <Route path="creator/builds/new" element={<BuildWizard />} />
+                    <Route path="creator/builds/:id/edit" element={<BuildWizard />} />
                     <Route path="creator/messages" element={<Workspace />} />
+                    {[...intelligenceWorkspaceRoutes].map((p) => (
+                      <Route key={p} path={p} element={<IntelligenceWorkspace />} />
+                    ))}
                     {[
                       ...creatorRoutes.filter(
-                        (p) => !p.endsWith("/new") && !p.endsWith("/messages"),
+                        (p) =>
+                          !p.endsWith("/new") &&
+                          !p.endsWith("/messages") &&
+                          !intelligenceWorkspaceRoutes.has(p),
                       ),
-                      ...buildAdminRoutes,
-                      ...buildProviderRoutes,
+                      ...buildAdminRoutes.filter((p) => !intelligenceWorkspaceRoutes.has(p)),
+                      ...buildProviderRoutes.filter((p) => !intelligenceWorkspaceRoutes.has(p)),
                     ].map((p) => (
                       <Route key={p} path={p} element={<BuildWorkspace />} />
                     ))}
@@ -210,34 +272,31 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     ].map((p) => (
                       <Route key={p} path={p} element={<Discovery />} />
                     ))}
+                    <Route path="use-cases/:slug" element={<UseCaseIntelligenceDetail />} />
+                    <Route path="technologies/:slug" element={<TechnologyIntelligenceDetail />} />
                     {[
-                      "use-cases",
                       "solution-stacks",
-                      "technologies",
                       "categories",
                       "providers",
                       "integrators",
                       "consultants",
                     ].map((p) => (
-                      <Route
-                        key={p}
-                        path={p + "/:slug"}
-                        element={<Details />}
-                      />
+                      <Route key={p} path={p + "/:slug"} element={<Details />} />
                     ))}
                     {["compare", "app/compare"].map((p) => (
                       <Route key={p} path={p} element={<Compare />} />
                     ))}
                     {[...buyerRoutes, ...providerRoutes, ...adminRoutes]
-                      .filter((p) => p !== "/app/compare")
+                      .filter(
+                        (p) =>
+                          p !== "/app/compare" &&
+                          !intelligenceWorkspaceRoutes.has(p),
+                      )
                       .map((p) => (
                         <Route key={p} path={p} element={<Workspace />} />
                       ))}
                     <Route path="app/projects/:id" element={<Workspace />} />
-                    <Route
-                      path="provider/listings/:id"
-                      element={<Workspace />}
-                    />
+                    <Route path="provider/listings/:id" element={<Workspace />} />
                     {authRoutes.map((p) => (
                       <Route key={p} path={p} element={<Auth />} />
                     ))}
@@ -262,10 +321,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     ))}
                     <Route path="updates/:slug" element={<Content />} />
                     <Route path="resources/:slug" element={<Content />} />
-                    <Route
-                      path="*"
-                      element={<EmptyState title="Page not found" />}
-                    />
+                    <Route path="*" element={<EmptyState title="Page not found" />} />
                   </Route>
                 </Routes>
               </Suspense>
