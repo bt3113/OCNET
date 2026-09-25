@@ -174,7 +174,7 @@ export function profileFromIntent(
   ];
   return {
     id: overrides.id ?? `requirement-${Date.now()}`,
-    name: overrides.name ?? intent.slice(0, 80) || "Business outcome requirement",
+    name: (overrides.name ?? intent.slice(0, 80)) || "Business outcome requirement",
     ownerId,
     objective: overrides.objective ?? intent,
     industry: overrides.industry ?? industry,
