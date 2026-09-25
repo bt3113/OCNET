@@ -1,5 +1,6 @@
 import type { Table, Tables } from "./model";
 import { buildProducts, buildProviders } from "./build-seed";
+import { intelligenceSeed } from "./intelligence-seed";
 import { seed } from "./seed";
 export interface Repository {
   list<K extends Table>(table: K): Promise<Tables[K][]>;
@@ -11,7 +12,8 @@ const key = "oracnet:v1:";
 export class DemoRepository implements Repository {
   private read<K extends Table>(table: K): Tables[K][] {
     const raw = localStorage.getItem(key + table);
-    if (!raw) return structuredClone((seed[table] ?? []) as Tables[K][]);
+    const base = (seed[table] ?? intelligenceSeed[table] ?? []) as Tables[K][];
+    if (!raw) return structuredClone(base);
     try {
       const parsed: unknown = JSON.parse(raw);
       if (!Array.isArray(parsed)) throw Error();
