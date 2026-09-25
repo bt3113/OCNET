@@ -1,6 +1,12 @@
 import type { BuildTables } from "./build-model";
+import type { IntelligenceTables } from "./intelligence-model";
 export type Role =
-  "creator" | "buyer" | "provider" | "integrator" | "consultant" | "admin";
+  | "creator"
+  | "buyer"
+  | "provider"
+  | "integrator"
+  | "consultant"
+  | "admin";
 export type Provenance =
   | "verified"
   | "vendor supplied"
@@ -111,6 +117,8 @@ export interface Update extends RecordBase {
 export type Article = Update;
 export interface Project extends RecordBase {
   sourceBuildId?: string;
+  sourceImplementationId?: string;
+  sourceBlueprintId?: string;
   sourceStackProductIds?: string[];
   description: string;
   category: string;
@@ -118,6 +126,9 @@ export interface Project extends RecordBase {
   timeline: string;
   status: "draft" | "open" | "awarded" | "closed";
   capabilities: string[];
+  desiredOutcomes?: string[];
+  currentSystems?: string[];
+  contextSummary?: string;
 }
 export interface Proposal extends RecordBase {
   projectId: string;
@@ -125,6 +136,14 @@ export interface Proposal extends RecordBase {
   description: string;
   estimate: string;
   status: "submitted" | "shortlisted" | "accepted" | "declined";
+  proposedArchitecture?: string;
+  technologyIds?: string[];
+  substitutions?: string[];
+  implementationTimeline?: string;
+  ongoingService?: string;
+  assumptions?: string[];
+  dependencies?: string[];
+  evidenceImplementationIds?: string[];
 }
 export interface SavedItem extends RecordBase {
   ownerId?: string;
@@ -183,7 +202,7 @@ export interface WorkspaceRecord extends RecordBase {
   status?: string;
   [key: string]: unknown;
 }
-export interface Tables extends BuildTables {
+export interface Tables extends BuildTables, IntelligenceTables {
   users: User;
   organizations: Organization;
   providers: Provider;
