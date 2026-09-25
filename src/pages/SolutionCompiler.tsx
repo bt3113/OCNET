@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, CircleHelp, FileSearch, ListRestart, Search, SlidersHorizontal } from "lucide-react";
 import { PageHeading } from "../components/layout";
 import { Badge, ErrorState, Skeleton } from "../components/ui";
@@ -47,6 +47,16 @@ export default function SolutionCompiler() {
   const [showDominated, setShowDominated] = useState(false);
   const [order, setOrder] = useState<Order>("default");
   const [saving, setSaving] = useState(false);
+  const [params] = useSearchParams();
+  const handedOff = useRef(false);
+  // Intent handed over from the homepage: structure it once, still fully editable.
+  useEffect(() => {
+    const incoming = params.get("intent")?.trim();
+    if (handedOff.current || !incoming || data.isLoading) return;
+    handedOff.current = true;
+    setIntent(incoming);
+    if (incoming.length >= 12) setProfile(profileFromIntent(incoming, userId || "anonymous", `requirement-${crypto.randomUUID()}`, data.products));
+  }, [params, data.isLoading, data.products, userId]);
   const validation = profile ? validateProfile(profile) : null;
   const serviceUseCases = data.useCases.filter((useCase) => data.blueprints.some((blueprint) => blueprint.useCaseIds.includes(useCase.id)));
 

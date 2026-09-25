@@ -41,7 +41,7 @@ import type {
 import { evidenceLevelInfo, evidenceSignals } from "../data/evidence";
 import { describeChange, formatMetricValue, metricChange } from "../data/metrics";
 import { rightsCatalogue } from "../data/rights";
-import { implementationFreshness, stalenessLabels } from "../data/staleness";
+import { computeFreshness, freshnessPolicies, implementationFreshness, stalenessLabels } from "../data/staleness";
 import { similaritySummary } from "../data/context-similarity";
 import type { TimelineEvent } from "../data/provenance";
 import { capabilityLabel } from "../data/taxonomy";
@@ -480,7 +480,7 @@ export function BlueprintCard({
         <span className="category-icon sand"><Layers3 size={22} aria-hidden /></span>
         <div className="row wrap">
           <Badge>{blueprint.demo ? "DEMO BLUEPRINT" : "BLUEPRINT"}</Badge>
-          <StalenessBadge state={freshness ?? blueprint.compatibilityState} />
+          <StalenessBadge state={freshness ?? computeFreshness({ lastReviewedAt: version?.lastValidatedAt ?? blueprint.lastValidatedAt, archived: blueprint.compatibilityState === "archived" }, new Date(), freshnessPolicies.blueprintCompatibility).state} />
         </div>
       </div>
       <Link to={`/blueprints/${blueprint.slug}`} className="blueprint-card-title">

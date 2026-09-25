@@ -5,7 +5,7 @@ import {
   productAttributeOverrides,
   intelligenceStacks,
   intelligenceUseCases,
-} from "./intelligence-seed";
+} from "./intelligence-seed.ts";
 import type {
   Category,
   Provider,

@@ -1,4 +1,4 @@
-import { sha256Hex } from "./canonical";
+import { sha256Hex } from "./canonical.ts";
 import type {
   Attestation,
   Claim,

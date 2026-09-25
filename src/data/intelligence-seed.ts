@@ -1,6 +1,6 @@
 import type { IntelligenceTables, EvidenceLevel } from "./intelligence-model";
 import type { Product, Provider, SolutionStack, UseCase } from "./model";
-import { hashToken } from "./attestation";
+import { hashToken } from "./attestation.ts";
 
 /**
  * ILLUSTRATIVE DEMO DATA. Every business, outcome, cost, claim, review and

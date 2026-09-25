@@ -815,7 +815,10 @@ export function substituteComponent(
     relevantImplementationIds: result.trace.relevantImplementationIds,
   };
   const replaced = { ...evaluateAssignment(ctx, blueprint, version, { ...original.assignment, [slotId]: productId }), substituted: true, solutionRunId: result.run.id };
-  const pool = result.candidates.map((candidate) => (candidate.id === candidateId ? replaced : candidate));
+  // The new combination may already exist as another (e.g. dominated) variant; keep one copy.
+  const pool = result.candidates
+    .filter((candidate) => candidate.id === candidateId || candidate.id !== replaced.id)
+    .map((candidate) => (candidate.id === candidateId ? replaced : candidate));
   const candidates = applyTradeoffLabels(markParetoDominance(pool));
   const trace: DecisionTrace = {
     ...result.trace,

@@ -103,6 +103,17 @@ describe("implementation records", () => {
     await as("", "anon");
     expect((await rows<{ name: string }>(`select name from public.implementation_records where id='a-public'`))[0].name).toBe("Record a-public name");
   });
+  it("private customer identity is visible to its owner only", async () => {
+    await as(owner);
+    await db.exec(`insert into public.implementation_customer_identities("implementationId","customerName") values('a-draft','Private Customer Ltd')`);
+    expect(await rows("select 1 from public.implementation_customer_identities")).toHaveLength(1);
+    await as(other);
+    expect(await rows("select 1 from public.implementation_customer_identities")).toHaveLength(0);
+    await expect(db.exec(`insert into public.implementation_customer_identities("implementationId","customerName") values('a-public','Spoofed')`)).rejects.toThrow();
+    await as("", "anon");
+    expect(await rows("select 1 from public.implementation_customer_identities")).toHaveLength(0);
+    expect(await rows("select 1 from public.attestation_contacts")).toHaveLength(0);
+  });
 });
 
 describe("claims", () => {

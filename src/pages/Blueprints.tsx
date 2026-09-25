@@ -248,7 +248,7 @@ function BlueprintDetail({ slug }: { slug: string }) {
             {manifest && (
               <div className="row wrap">
                 <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}-manifest.json`, manifest)}><Download size={15} aria-hidden /> Oracnet manifest</button>
-                <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}.cdx.json`, toCycloneDx(manifest))}><Download size={15} aria-hidden /> CycloneDX 1.6</button>
+                <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}.cdx.json`, toCycloneDx(manifest))}><Download size={15} aria-hidden /> CycloneDX 1.7</button>
                 <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}.spdx.json`, toSpdx(manifest))}><Download size={15} aria-hidden /> SPDX 2.3</button>
               </div>
             )}

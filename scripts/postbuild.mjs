@@ -21,9 +21,18 @@ import {
 } from "../src/data/seed.ts";
 import { builds, creators } from "../src/data/build-seed.ts";
 import { implementationRecords, blueprints } from "../src/data/intelligence-seed.ts";
+// Only public, approved records get static pages, metadata and sitemap entries.
+// Private customer identity never appears here: descriptions use the public summary.
+const publicImplementations = implementationRecords.filter(
+  (record) => record.publicationState === "published" && record.moderationState === "approved" && record.visibility === "public",
+);
+const publicBlueprints = blueprints.filter(
+  (blueprint) => blueprint.publicationState === "published" && blueprint.moderationState === "approved",
+);
 const entities = [
-  ["implementations", implementationRecords],
-  ["blueprints", blueprints],
+  ["implementations", publicImplementations],
+  ["blueprints", publicBlueprints],
+  ["implementers", integrators],
   ["builds", builds],
   ["creators", creators],
   ["technologies", products],
@@ -55,7 +64,6 @@ const routes = [
     ...buildAdminRoutes,
     ...buildProviderRoutes,
     "/implementation/new",
-    "/verify/demo-attestation",
     ...entities.map((entity) => entity.path),
   ]),
 ];

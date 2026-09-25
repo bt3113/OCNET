@@ -81,10 +81,11 @@ export default function Home() {
       <div className="home-intro intelligence-home-intro">
         <div>
           <span className="eyebrow">OUTCOME → EVIDENCE → ARCHITECTURE → PROCUREMENT</span>
-          <h1>What do you want your business to do better?</h1>
+          <h1>What are you trying to improve?</h1>
           <p>
-            See how comparable implementations are structured, understand the
-            technology and evidence, then decide what to reuse or who to hire.
+            See how comparable businesses implemented it, understand the
+            technology and evidence, then find someone who can deploy something
+            similar.
           </p>
         </div>
         <ButtonLink to="/implementation/new" variant="light">

@@ -302,11 +302,11 @@ describe("Blueprint manifest adapters", () => {
     expect(v11.capabilitySlots).toHaveLength(7);
     expect(v11.license.commercialUse).toBe(false);
   });
-  it("exports CycloneDX 1.6 services/dependencies and SPDX 2.3 packages deterministically", () => {
+  it("exports CycloneDX 1.7 services/dependencies and SPDX 2.3 packages deterministically", () => {
     const v11 = manifest("inquiry-booking-reference-v1-1");
     const cdx = toCycloneDx(v11);
     expect(cdx.bomFormat).toBe("CycloneDX");
-    expect(cdx.specVersion).toBe("1.6");
+    expect(cdx.specVersion).toBe("1.7");
     expect(cdx.serialNumber).toMatch(/^urn:uuid:[0-9a-f-]{36}$/);
     expect(cdx.services.map((s) => s["bom-ref"])).toContain("component:hubspot");
     expect(cdx.dependencies[0].dependsOn).toHaveLength(7);
@@ -423,6 +423,14 @@ describe("solution compiler", () => {
     expect(final.feasible).toBe(false);
     expect(final.constraintResults.find((r) => r.id === "compatibility")!.outcome).toBe("violated");
     expect(broken.trace.substitutions).toHaveLength(2);
+  });
+  it("never duplicates a candidate when a substitution recreates an existing variant", () => {
+    const result = compile();
+    const candidate = result.candidates.find((c) => c.sourceBlueprintId === "inquiry-booking-reference" && !c.dominated)!;
+    const slot = Object.keys(candidate.assignment).find((key) => candidate.assignment[key] === "n8n")!;
+    const next = substituteComponent(result, candidate.id, slot, "flow-agent", catalogue);
+    const ids = next.candidates.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
   it("uses a conservative Pareto rule that never compares unknown values", () => {
     const candidate = compile().candidates[0];

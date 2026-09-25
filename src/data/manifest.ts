@@ -116,13 +116,13 @@ function uuidFromDigest(value: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-/** CycloneDX 1.6 JSON. Third-party SaaS products are modelled as `services`. */
+/** CycloneDX 1.7 JSON. Third-party SaaS products are modelled as `services`. */
 export function toCycloneDx(manifest: BlueprintManifest) {
   const serial = uuidFromDigest(digest(manifest));
   const blueprintRef = `blueprint:${manifest.blueprint.id}@${manifest.blueprint.version}`;
   return {
     bomFormat: "CycloneDX",
-    specVersion: "1.6",
+    specVersion: "1.7",
     serialNumber: `urn:uuid:${serial}`,
     version: 1,
     metadata: {
