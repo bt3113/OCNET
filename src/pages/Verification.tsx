@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   CheckCircle2,
@@ -72,10 +72,9 @@ export default function Verification() {
     (claim) =>
       claim.subjectId === implementation.id || metricIds.includes(claim.subjectId),
   );
-  const decidedCount = useMemo(
-    () => reviewableClaims.filter((claim) => decisions[claim.id] && decisions[claim.id] !== "skip").length,
-    [reviewableClaims, decisions],
-  );
+  const decidedCount = reviewableClaims.filter(
+    (claim) => decisions[claim.id] && decisions[claim.id] !== "skip",
+  ).length;
 
   async function submit() {
     if (!reviewableClaims.length) return;
