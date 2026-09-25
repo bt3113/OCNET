@@ -106,25 +106,26 @@ export default function Blueprints() {
         action="Explore Blueprints"
       />
     );
+  const activeBlueprint = blueprint;
   const blueprintVersions = versions
-    .filter((version) => version.blueprintId === blueprint.id)
+    .filter((version) => version.blueprintId === activeBlueprint.id)
     .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
   const activeVersion =
     blueprintVersions.find((version) => version.id === versionId) ??
-    blueprintVersions.find((version) => version.id === blueprint.currentVersionId) ??
+    blueprintVersions.find((version) => version.id === activeBlueprint.currentVersionId) ??
     blueprintVersions[0];
   const activeItems = stackItems.filter(
     (item) => item.blueprintVersionId === activeVersion?.id,
   );
-  const sourceImplementation = blueprint.derivedFromImplementationId
+  const sourceImplementation = activeBlueprint.derivedFromImplementationId
     ? implementations.find(
-        (implementation) => implementation.id === blueprint.derivedFromImplementationId,
+        (implementation) => implementation.id === activeBlueprint.derivedFromImplementationId,
       )
     : undefined;
   const blueprintRequirements = requirements.filter(
-    (requirement) => requirement.blueprintId === blueprint.id,
+    (requirement) => requirement.blueprintId === activeBlueprint.id,
   );
-  const license = licenses.find((item) => item.blueprintId === blueprint.id);
+  const license = licenses.find((item) => item.blueprintId === activeBlueprint.id);
 
   async function requestImplementation() {
     if (!userId) {
@@ -135,19 +136,19 @@ export default function Blueprints() {
     const id = crypto.randomUUID();
     await actions.save("projects", {
       id,
-      name: `Implement ${blueprint.name}`,
-      sourceBlueprintId: blueprint.id,
-      sourceImplementationId: blueprint.derivedFromImplementationId,
-      description: `Private requirement seeded from Blueprint “${blueprint.name}”. Replace assumptions and validate every integration before supplier outreach.`,
+      name: `Implement ${activeBlueprint.name}`,
+      sourceBlueprintId: activeBlueprint.id,
+      sourceImplementationId: activeBlueprint.derivedFromImplementationId,
+      description: `Private requirement seeded from Blueprint “${activeBlueprint.name}”. Replace assumptions and validate every integration before supplier outreach.`,
       contextSummary: "Adapt this reusable reference architecture to the buyer's actual business context.",
       category: "automation",
       budget: "To be discussed",
       timeline: "1–3 months",
       status: "draft",
-      capabilities: blueprint.capabilityIds,
+      capabilities: activeBlueprint.capabilityIds,
       desiredOutcomes: ["Implement the referenced business outcome with validated constraints"],
       currentSystems: [],
-      provenance: blueprint.demo ? "demo" : "community supplied",
+      provenance: activeBlueprint.demo ? "demo" : "community supplied",
     });
     notify("Private project draft created from this Blueprint.");
     navigate(`/app/projects/${id}`);
@@ -158,23 +159,23 @@ export default function Blueprints() {
       <Breadcrumbs
         items={[
           { name: "Blueprints", to: "/blueprints" },
-          { name: blueprint.name },
+          { name: activeBlueprint.name },
         ]}
       />
       <div className="blueprint-detail-hero">
         <div>
           <div className="row wrap">
-            <Badge>{blueprint.demo ? "DEMO BLUEPRINT" : "BLUEPRINT"}</Badge>
-            <StalenessBadge state={blueprint.compatibilityState} />
-            <EvidenceBadge level={blueprint.demo ? "demo" : "creator-reported"} />
+            <Badge>{activeBlueprint.demo ? "DEMO BLUEPRINT" : "BLUEPRINT"}</Badge>
+            <StalenessBadge state={activeBlueprint.compatibilityState} />
+            <EvidenceBadge level={activeBlueprint.demo ? "demo" : "creator-reported"} />
           </div>
           <PageHeading
             eyebrow="SANITIZED REFERENCE ARCHITECTURE"
-            title={blueprint.name}
-            description={blueprint.description}
+            title={activeBlueprint.name}
+            description={activeBlueprint.description}
           />
           <div className="tags">
-            {blueprint.capabilityIds.map((capability) => (
+            {activeBlueprint.capabilityIds.map((capability) => (
               <span key={capability}>{capability}</span>
             ))}
           </div>
@@ -182,10 +183,10 @@ export default function Blueprints() {
         <div className="card blueprint-action-card">
           <strong>Reuse state</strong>
           <dl className="detail-list">
-            <div><dt>Rights</dt><dd>{blueprint.reuseRights.replaceAll("-", " ")}</dd></div>
-            <div><dt>Commercial use</dt><dd>{blueprint.commercialUseAllowed ? "Allowed" : "Not granted"}</dd></div>
-            <div><dt>Source</dt><dd>{blueprint.sourceAvailable ? "Available" : "Not included"}</dd></div>
-            <div><dt>Last validated</dt><dd>{blueprint.lastValidatedAt}</dd></div>
+            <div><dt>Rights</dt><dd>{activeBlueprint.reuseRights.replaceAll("-", " ")}</dd></div>
+            <div><dt>Commercial use</dt><dd>{activeBlueprint.commercialUseAllowed ? "Allowed" : "Not granted"}</dd></div>
+            <div><dt>Source</dt><dd>{activeBlueprint.sourceAvailable ? "Available" : "Not included"}</dd></div>
+            <div><dt>Last validated</dt><dd>{activeBlueprint.lastValidatedAt}</dd></div>
           </dl>
           <button className="button dark" type="button" onClick={() => void requestImplementation().catch(() => {})}>
             Request implementation <ArrowRight size={17} />
@@ -216,7 +217,7 @@ export default function Blueprints() {
       )}
 
       <BlueprintArchitecture
-        blueprint={blueprint}
+        blueprint={activeBlueprint}
         version={activeVersion}
         items={activeItems}
         products={products}
@@ -244,7 +245,7 @@ export default function Blueprints() {
             <ShieldAlert size={22} />
             <div>
               <h3>Known limitations</h3>
-              <p>{blueprint.knownLimitations}</p>
+              <p>{activeBlueprint.knownLimitations}</p>
             </div>
           </div>
         </section>
@@ -252,7 +253,7 @@ export default function Blueprints() {
           <div className="card blueprint-license-card">
             <FileKey2 size={22} />
             <h3>Rights & license</h3>
-            <p>{license?.licenseText ?? blueprint.license}</p>
+            <p>{license?.licenseText ?? activeBlueprint.license}</p>
             <dl className="detail-list">
               <div><dt>Attribution</dt><dd>{license?.attributionRequired ? "Required" : "Not specified"}</dd></div>
               <div><dt>Commercial use</dt><dd>{license?.commercialUseAllowed ? "Allowed" : "Not granted"}</dd></div>
@@ -262,7 +263,7 @@ export default function Blueprints() {
             <Wrench size={22} />
             <h3>Maintenance state</h3>
             <p>Blueprints decay as APIs, auth schemes and product capabilities change.</p>
-            <StalenessBadge state={blueprint.compatibilityState} />
+            <StalenessBadge state={activeBlueprint.compatibilityState} />
           </div>
         </aside>
       </div>
