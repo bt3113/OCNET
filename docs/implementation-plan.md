@@ -2,6 +2,10 @@
 
 This branch evolves Oracnet from a Build-led marketplace into a vendor-neutral implementation intelligence and procurement layer without removing Builds, stacks, providers, creators, or buyer Projects.
 
+## Status
+
+All seven workstreams are implemented; current state, decisions and remaining gaps are tracked in [implementation-progress.md](implementation-progress.md) and verification in [qa.md](qa.md).
+
 ## Workstreams
 
 1. **Domain model** — add Implementation Records, normalized metrics/claims/evidence, versioned Blueprints, compatibility relationships, Requirement Profiles and reproducible Solution Runs.

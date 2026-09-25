@@ -49,3 +49,7 @@ It does not create accounts/passwords. Use an isolated staging database. Databas
 ## Deliberately deferred
 
 Production payment/entitlement services, private repository access, live provider verification, outbound email, full invitation lifecycle, semantic embeddings, general URL gateway operations, production legal review, SSR metadata for user-created entities and real-user performance monitoring need external services or production operations. Pages remains the complete browser-local demonstration.
+
+## Relationship to implementation intelligence
+
+Builds remain creator showcases. They are listed on technology pages as “creator projects, not deployment evidence”, never count toward implementation evidence in the Solution Compiler, and never become Implementation Records or Blueprints automatically.

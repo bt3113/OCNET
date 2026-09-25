@@ -18,25 +18,40 @@ Baseline: lint, typecheck and 32 unit tests pass. E2E needs `CHROMIUM_EXECUTABLE
 | Seed | Stacks lack CRM/calendar; all records on `customer-support`; property record linked to a dental Build; every relationship `observed-together` |
 | Tests | No unit or E2E coverage for any intelligence feature |
 
-## Workstreams
-- [ ] Domain core (similarity, fingerprint, metrics, evidence signals, staleness, rights, sanitization, provenance, manifest, attestation, compiler)
-- [ ] Seed coherence
-- [ ] UI (compiler, detail, discovery, compare, blueprints, attestation, wizard, admin, implementer profile)
-- [ ] Supabase migration/RLS/Edge Functions/security tests
-- [ ] E2E + visual/a11y QA, docs, quality gate
+## Workstreams (all complete on this branch)
+
+- [x] Domain core: context similarity, fingerprint v1.0, metrics, evidence signals, staleness, rights, sanitization, PROV-JSON, manifests (CycloneDX 1.7 / SPDX 2.3), attestation tokens, deterministic compiler with decision trace
+- [x] Seed coherence: 5 illustrative records across 3 use cases, 5 Blueprints (all rights/staleness states represented), 30 typed relationships including incompatible and requires-middleware
+- [x] UI: compiler, implementation detail/discovery/comparison, Blueprints, verification, 15-step wizard, creator/provider/admin workspaces, implementer profiles, unified search
+- [x] Supabase: `202609250003` hardening (all 9 audit defects below), `202609250004` RRF search, `attestation` and `evidence` Edge Functions, 19 PGlite RLS tests
+- [x] QA and docs: see `docs/qa.md`
 
 ## Decisions
-- Designated push branch is `claude/oracnet-implementation-completion-inadg1`; its draft PR targets `feature/implementation-intelligence` so PR #2 stays the canonical integration PR.
 
-## Known defects / blockers
-RLS audit of `202609250001` (confirmed with PGlite), to fix in `202609250003`:
-1. `claims` insert/update never checks subject ownership; claims can be retargeted; `claim_is_public` ignores status and trusts any relationship claim.
-2. Accepted claims keep status/evidence level when predicate/unit/period/subject change.
-3. Owners can self-set `evidenceLevel` on metrics/stack items/connections; trusted fields (provenance, staleness, permission) on insert.
-4. Material edits after approval (non-core record fields, child rows, Blueprint versions/items/licenses) do not return to moderation.
-5. Attestation rows insertable with `submitted` status/long expiry; no server token validation exists.
-6. `claim_evidence` attachable to others' claims; `storagePath` can point into another user's folder.
-7. Audit log records no old/new values, misses many tables; `verification_events`/`evidence_reviews` deletable by admins; `audit_events.actorId` FK blocks account deletion.
-8. `solution_runs.requirementProfileId` can reference another user's profile; helper functions executable by anon.
-9. Connected mode: claims/blueprints cannot round-trip through `upsert().select()`; many model fields have no column.
-Security tests currently load neither intelligence migration.
+- Designated push branch is `claude/oracnet-implementation-completion-inadg1`; its draft PR targets `feature/implementation-intelligence` so PR #2 stays the canonical integration PR.
+- Relational model stays canonical; PROV, CycloneDX, SPDX and VC 2.0 are export adapters.
+- Compiler stays a TypeScript enumerator with Pareto filtering; no solver service, no AI in ranking.
+- Custom SVG architecture map instead of a graph library.
+- Demo admin/provider workspaces stay reachable (labelled) so the demo is explorable; connected mode enforces roles in RLS.
+- Candidate explanations are stored on `solution_candidates.explanation`; the `solution_explanations` table from `202609250001` is no longer written and can be dropped in a later migration.
+
+## Audit defects (all fixed in `202609250003`, covered by `tests/security/intelligence-rls.test.ts`)
+
+1. Claims could target or be moved to others' subjects; `claim_is_public` ignored status.
+2. Accepted claims kept their status after material changes.
+3. Owners could self-set evidence levels and trusted fields.
+4. Material edits after approval did not return to moderation.
+5. Attestations insertable as submitted; no server-side token validation.
+6. `claim_evidence` and `storagePath` could point at others' claims or folders.
+7. Audit log lacked old/new values and coverage; review rows deletable; `actorId` FK blocked account deletion.
+8. `solution_runs` could reference others' profiles; helpers executable by anon.
+9. Connected-mode round-trips failed for claims/Blueprints; model fields had no columns.
+
+## Remaining gaps
+
+- Not exercised against a provisioned Supabase project: migrations 0003/0004, Edge Functions, signed Storage, mail delivery (Resend), multi-user RLS on real Postgres, `hybrid_search_rrf` (needs pgvector and an embedding job).
+- VC 2.0 output is unsigned; no issuer key management.
+- No scheduled job yet for attestation expiry, contact purge, freshness recompute or embeddings.
+- Dynamic metadata for unknown slugs still relies on the SPA fallback on GitHub Pages (see `docs/production-architecture.md`).
+- Manual screen-reader testing and field performance measurement not done.
+- Legal/privacy review of rights states, retention periods, attestation wording and terms is outstanding.
