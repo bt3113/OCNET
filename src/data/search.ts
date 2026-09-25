@@ -35,21 +35,25 @@ export interface SearchDocument {
   provenance: string;
 }
 export interface SearchCatalogue {
-  implementations: ImplementationRecord[];
-  implementationContexts: ImplementationContext[];
-  blueprints: Blueprint[];
+  implementations?: ImplementationRecord[];
+  implementationContexts?: ImplementationContext[];
+  blueprints?: Blueprint[];
   builds: Build[];
   products: Product[];
   creators: CreatorProfile[];
   providers: Provider[];
-  implementers: Provider[];
+  implementers?: Provider[];
   cases: UseCase[];
   stacks: SolutionStack[];
   articles: Article[];
 }
 export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
+  const implementations = c.implementations ?? [];
+  const implementationContexts = c.implementationContexts ?? [];
+  const blueprints = c.blueprints ?? [];
+  const implementers = c.implementers ?? [];
   return [
-    ...c.implementations
+    ...implementations
       .filter(
         (implementation) =>
           implementation.publicationState === "published" &&
@@ -57,7 +61,7 @@ export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
           implementation.visibility === "public",
       )
       .map((implementation) => {
-        const context = c.implementationContexts.find(
+        const context = implementationContexts.find(
           (item) => item.implementationId === implementation.id,
         );
         const completenessScore = [
@@ -88,7 +92,7 @@ export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
           provenance: implementation.provenance,
         };
       }),
-    ...c.blueprints
+    ...blueprints
       .filter(
         (blueprint) =>
           blueprint.publicationState === "published" &&
@@ -184,7 +188,7 @@ export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
       completeness: 50,
       provenance: provider.provenance,
     })),
-    ...c.implementers.map((provider) => ({
+    ...implementers.map((provider) => ({
       id: `implementer-${provider.id}`,
       name: provider.name,
       description: provider.description,
