@@ -1,4 +1,11 @@
 import { buildSeed, buildProducts, buildProviders } from "./build-seed.ts";
+import {
+  intelligenceProducts,
+  intelligenceProviders,
+  productAttributeOverrides,
+  intelligenceStacks,
+  intelligenceUseCases,
+} from "./intelligence-seed";
 import type {
   Category,
   Provider,
@@ -540,8 +547,11 @@ export const articles = [
     provenance: "demo" as const,
   },
 ];
-providers.push(...buildProviders);
-products.push(...buildProducts);
+providers.push(...buildProviders, ...intelligenceProviders);
+products.push(...buildProducts, ...intelligenceProducts);
+for (const product of products) Object.assign(product, productAttributeOverrides[product.id] ?? {});
+useCases.unshift(...intelligenceUseCases);
+stacks.unshift(...intelligenceStacks);
 export const seed: Partial<{ [K in Table]: Tables[K][] }> = {
   ...buildSeed,
   organizations: [

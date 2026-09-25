@@ -203,7 +203,22 @@ export type EventType =
   | "offer_click"
   | "contact_creator"
   | "search"
-  | "filter_use";
+  | "filter_use"
+  | "implementation_view"
+  | "implementation_saved"
+  | "metric_provenance_opened"
+  | "implementation_compared"
+  | "context_similarity_viewed"
+  | "blueprint_view"
+  | "blueprint_started"
+  | "solution_compiler_started"
+  | "requirement_confirmed"
+  | "compiler_run_completed"
+  | "candidate_viewed"
+  | "candidate_rejected"
+  | "candidate_substitution"
+  | "implementation_request_started"
+  | "implementer_contacted";
 export interface MarketplaceEvent extends RecordBase {
   ownerId: string;
   event: EventType;
