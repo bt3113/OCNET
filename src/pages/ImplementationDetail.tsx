@@ -71,31 +71,32 @@ export default function ImplementationDetail() {
         action="Explore implementations"
       />
     );
+  const activeImplementation = implementation;
 
-  const context = contexts.find((item) => item.implementationId === implementation.id);
-  const recordMetrics = metrics.filter((item) => item.implementationId === implementation.id);
-  const recordSteps = processSteps.filter((item) => item.implementationId === implementation.id);
-  const recordStack = stackItems.filter((item) => item.implementationId === implementation.id);
-  const recordConnections = connections.filter((item) => item.implementationId === implementation.id);
+  const context = contexts.find((item) => item.implementationId === activeImplementation.id);
+  const recordMetrics = metrics.filter((item) => item.implementationId === activeImplementation.id);
+  const recordSteps = processSteps.filter((item) => item.implementationId === activeImplementation.id);
+  const recordStack = stackItems.filter((item) => item.implementationId === activeImplementation.id);
+  const recordConnections = connections.filter((item) => item.implementationId === activeImplementation.id);
   const recordClaims = claims.filter((claim) => {
-    if (claim.subjectType === "implementation") return claim.subjectId === implementation.id;
+    if (claim.subjectType === "implementation") return claim.subjectId === activeImplementation.id;
     if (claim.subjectType === "metric")
       return recordMetrics.some((metric) => metric.id === claim.subjectId);
     return false;
   });
   const derivedBlueprints = blueprints.filter((blueprint) =>
-    implementation.derivedBlueprintIds.includes(blueprint.id),
+    activeImplementation.derivedBlueprintIds.includes(blueprint.id),
   );
   const relatedImplementations = implementations
     .filter(
       (item) =>
-        item.id !== implementation.id &&
+        item.id !== activeImplementation.id &&
         item.businessType !== "" &&
         item.publicationState === "published",
     )
     .slice(0, 2);
   const implementers = integrators.filter((partner) =>
-    implementation.implementerIds.includes(partner.id),
+    activeImplementation.implementerIds.includes(partner.id),
   );
 
   async function requestSimilar() {
@@ -107,22 +108,22 @@ export default function ImplementationDetail() {
     const id = crypto.randomUUID();
     await actions.save("projects", {
       id,
-      name: `Something like ${implementation.name}`,
-      sourceImplementationId: implementation.id,
-      sourceBlueprintId: implementation.derivedBlueprintIds[0],
-      sourceBuildId: implementation.sourceBuildId,
-      description: `Private requirement seeded from the implementation record “${implementation.name}”. Review every assumption before sending it to suppliers.`,
-      contextSummary: implementation.contextSummary,
+      name: `Something like ${activeImplementation.name}`,
+      sourceImplementationId: activeImplementation.id,
+      sourceBlueprintId: activeImplementation.derivedBlueprintIds[0],
+      sourceBuildId: activeImplementation.sourceBuildId,
+      description: `Private requirement seeded from the implementation record “${activeImplementation.name}”. Review every assumption before sending it to suppliers.`,
+      contextSummary: activeImplementation.contextSummary,
       category: "automation",
-      budget: implementation.implementationCost == null
+      budget: activeImplementation.implementationCost == null
         ? "To be discussed"
-        : `Reference only: ${implementation.implementationCostCurrency} ${implementation.implementationCost.toLocaleString()} illustrative setup in the source record`,
-      timeline: implementation.implementationDuration,
+        : `Reference only: ${activeImplementation.implementationCostCurrency} ${activeImplementation.implementationCost.toLocaleString()} illustrative setup in the source record`,
+      timeline: activeImplementation.implementationDuration,
       status: "draft",
       capabilities: recordStack.map((item) => item.capabilityId),
       desiredOutcomes: recordMetrics.map((metric) => metric.name),
       currentSystems: context?.existingSystems ?? [],
-      provenance: implementation.demo ? "demo" : "community supplied",
+      provenance: activeImplementation.demo ? "demo" : "community supplied",
     });
     notify("Private project draft created from this implementation record.");
     navigate(`/app/projects/${id}`);
@@ -133,26 +134,26 @@ export default function ImplementationDetail() {
       <Breadcrumbs
         items={[
           { name: "Implementations", to: "/implementations" },
-          { name: implementation.name },
+          { name: activeImplementation.name },
         ]}
       />
       <div className="implementation-detail-hero">
         <div>
           <div className="row wrap implementation-badges">
-            <Badge>{implementation.demo ? "ILLUSTRATIVE RECORD" : "IMPLEMENTATION RECORD"}</Badge>
-            <EvidenceBadge level={implementation.verificationState} />
-            <StalenessBadge state={implementation.stalenessState} />
+            <Badge>{activeImplementation.demo ? "ILLUSTRATIVE RECORD" : "IMPLEMENTATION RECORD"}</Badge>
+            <EvidenceBadge level={activeImplementation.verificationState} />
+            <StalenessBadge state={activeImplementation.stalenessState} />
           </div>
           <PageHeading
             eyebrow="IMPLEMENTATION INTELLIGENCE"
-            title={implementation.name}
-            description={implementation.summary}
+            title={activeImplementation.name}
+            description={activeImplementation.summary}
           />
           <div className="row wrap implementation-meta-line">
-            <span>{implementation.businessType}</span>
-            <span>{implementation.organizationSizeBand}</span>
-            <span>{implementation.region}</span>
-            <span>Evidence reviewed {implementation.lastEvidenceReviewAt}</span>
+            <span>{activeImplementation.businessType}</span>
+            <span>{activeImplementation.organizationSizeBand}</span>
+            <span>{activeImplementation.region}</span>
+            <span>Evidence reviewed {activeImplementation.lastEvidenceReviewAt}</span>
           </div>
         </div>
         <div className="implementation-hero-actions card">
@@ -172,7 +173,7 @@ export default function ImplementationDetail() {
       </div>
       <EvidencePrincipleNotice />
 
-      <ContextSummary implementation={implementation} context={context} />
+      <ContextSummary implementation={activeImplementation} context={context} />
 
       <section className="intelligence-section">
         <div className="section-title-text">
@@ -226,35 +227,35 @@ export default function ImplementationDetail() {
             <CircleDollarSign size={22} />
             <small>Illustrative setup cost</small>
             <strong>
-              {implementation.implementationCost == null
+              {activeImplementation.implementationCost == null
                 ? "Not disclosed"
-                : `${implementation.implementationCostCurrency} ${implementation.implementationCost.toLocaleString()}`}
+                : `${activeImplementation.implementationCostCurrency} ${activeImplementation.implementationCost.toLocaleString()}`}
             </strong>
-            <span>{implementation.costDisclosureType.replaceAll("-", " ")}</span>
+            <span>{activeImplementation.costDisclosureType.replaceAll("-", " ")}</span>
           </div>
           <div className="card economics-card">
             <CalendarDays size={22} />
             <small>Implementation duration</small>
-            <strong>{implementation.implementationDuration}</strong>
+            <strong>{activeImplementation.implementationDuration}</strong>
             <span>Demo schedule</span>
           </div>
           <div className="card economics-card">
             <CircleDollarSign size={22} />
             <small>Illustrative monthly stack cost</small>
             <strong>
-              {implementation.ongoingMonthlyCost == null
+              {activeImplementation.ongoingMonthlyCost == null
                 ? "Not disclosed"
-                : `${implementation.implementationCostCurrency} ${implementation.ongoingMonthlyCost.toLocaleString()}`}
+                : `${activeImplementation.implementationCostCurrency} ${activeImplementation.ongoingMonthlyCost.toLocaleString()}`}
             </strong>
-            <span>{implementation.ongoingCostDisclosureType.replaceAll("-", " ")}</span>
+            <span>{activeImplementation.ongoingCostDisclosureType.replaceAll("-", " ")}</span>
           </div>
           <div className="card economics-card">
             <Wrench size={22} />
             <small>Maintenance</small>
             <strong>
-              {implementation.maintenanceHoursPerMonth == null
+              {activeImplementation.maintenanceHoursPerMonth == null
                 ? "Not disclosed"
-                : `${implementation.maintenanceHoursPerMonth} hrs / month`}
+                : `${activeImplementation.maintenanceHoursPerMonth} hrs / month`}
             </strong>
             <span>Illustrative operating effort</span>
           </div>
