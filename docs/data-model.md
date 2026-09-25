@@ -29,3 +29,16 @@ Provenance: verified, vendor supplied, third-party sourced, community supplied, 
 `build_offers`, `build_comments`, `build_updates`, `build_forks`, `creator_follows`, `collections`, `collection_items`, `build_comparisons` and `marketplace_events` model interaction. `user_roles`, `organization_memberships` and `build_collaborators` define trusted authorization. `reports`, `provider_claims` and immutable `audit_events` support review. `import_budgets` is a server-managed rate-limit counter. `search_embeddings` is server-only, with no browser RLS policies. Each exposed new table has RLS enabled.
 
 A Build is never stored in `projects`: that existing entity is a procurement brief. It can reference `sourceBuildId` and `sourceStackProductIds` without copying ownership. Provenance, publication, moderation, verification, visibility, source availability and reuse permission are separate states.
+
+## Implementation intelligence tables
+
+| Area | Tables |
+| --- | --- |
+| Records | `implementation_records`, `implementation_contexts`, `implementation_process_steps`, `implementation_stack_items`, `implementation_connections`, `implementation_use_cases`, `implementation_capabilities`, `implementation_fingerprints`, `implementation_customer_identities` (private) |
+| Metrics | `metric_definitions`, `measurement_periods`, `implementation_metrics` |
+| Evidence | `claims`, `claim_evidence`, `evidence_artifacts`, `evidence_reviews`, `verification_events`, `attestations`, `attestation_contacts` (service role only) |
+| Blueprints | `blueprints`, `blueprint_versions`, `blueprint_stack_items` (capability slots), `blueprint_connections`, `blueprint_requirements`, `blueprint_licenses` |
+| Technology graph | `technology_relationships` (typed, with source type, middleware, conditions), `relationship_evidence`, `compatibility_checks` |
+| Compiler | `requirement_profiles`, `solution_runs` (snapshot, digests, trace JSONB), `solution_candidates` (raw objectives, constraint results, explanation JSONB), `solution_candidate_items` |
+
+JSONB is used only for genuinely document-shaped or extensible data: context `extensions`, requirement `strengths`, the immutable decision trace and candidate explanation, attestation `decisions`, Blueprint `externalReferences`. Types live in `src/data/intelligence-model.ts`; see [implementation records](implementation-records.md), [metric model](metric-model.md), [blueprints](blueprints.md).

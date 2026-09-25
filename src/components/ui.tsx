@@ -138,6 +138,40 @@ export function Modal({
     </Dialog.Root>
   );
 }
+/** Side sheet on wide screens, bottom sheet on phones. Same Radix focus handling as Modal. */
+export function Drawer({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="dialog-overlay" />
+        <Dialog.Content className="drawer-content">
+          <div className="dialog-heading">
+            <Dialog.Title>{title}</Dialog.Title>
+            <Dialog.Close className="icon-button" aria-label="Close panel">
+              <X size={20} />
+            </Dialog.Close>
+          </div>
+          <Dialog.Description className="muted">
+            {description || "Details and provenance."}
+          </Dialog.Description>
+          <div className="drawer-body">{children}</div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
 export function EmptyState({
   title = "Nothing here yet",
   description = "Explore the marketplace to find your next opportunity.",

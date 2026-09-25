@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -6,14 +6,15 @@ import {
   CircleHelp,
   Clock3,
   DatabaseZap,
-  ExternalLink,
+  Eye,
+  FileKey2,
   GitBranch,
   Layers3,
   LockKeyhole,
-  Scale,
   ShieldCheck,
   Sparkles,
   TriangleAlert,
+  UserRound,
   Workflow,
 } from "lucide-react";
 import type { Product } from "../data/model";
@@ -22,137 +23,171 @@ import type {
   BlueprintStackItem,
   BlueprintVersion,
   Claim,
+  ClaimEvidence,
   ContextSimilarity,
+  EvidenceArtifact,
   EvidenceLevel,
-  ImplementationConnection,
+  EvidenceReview,
   ImplementationContext,
   ImplementationMetric,
   ImplementationProcessStep,
   ImplementationRecord,
-  ImplementationStackItem,
+  MeasurementPeriod,
   MetricDefinition,
-  SolutionCandidate,
-  SolutionCandidateItem,
-  SolutionExplanation,
+  ReuseRights,
+  StalenessState,
+  TechnologyRelationshipType,
 } from "../data/intelligence-model";
-import { Badge, ButtonLink, Logo, Modal, SaveButton } from "./ui";
+import { evidenceLevelInfo, evidenceSignals } from "../data/evidence";
+import { describeChange, formatMetricValue, metricChange } from "../data/metrics";
+import { rightsCatalogue } from "../data/rights";
+import { computeFreshness, freshnessPolicies, implementationFreshness, stalenessLabels } from "../data/staleness";
+import { similaritySummary } from "../data/context-similarity";
+import type { TimelineEvent } from "../data/provenance";
+import { capabilityLabel } from "../data/taxonomy";
+import { Badge, Drawer, SaveButton } from "./ui";
 
-const evidenceLabels: Record<EvidenceLevel, string> = {
-  "creator-reported": "Creator reported",
-  "customer-attested": "Customer attested",
-  "evidence-reviewed": "Evidence reviewed",
-  "platform-observed": "Platform observed",
-  "independently-audited": "Independently audited",
-  demo: "Demo / synthetic",
-  unverified: "Unverified",
-};
-
-export function EvidenceBadge({
-  level,
-  compact = false,
-}: {
-  level: EvidenceLevel;
-  compact?: boolean;
-}) {
+export function EvidenceBadge({ level, compact = false, demo = false }: { level: EvidenceLevel; compact?: boolean; demo?: boolean }) {
   const icon =
-    level === "unverified" ? (
-      <CircleHelp size={compact ? 13 : 15} />
-    ) : level === "demo" ? (
-      <TriangleAlert size={compact ? 13 : 15} />
-    ) : (
-      <ShieldCheck size={compact ? 13 : 15} />
-    );
+    level === "unverified" ? <CircleHelp size={13} aria-hidden /> : level === "demo" ? <TriangleAlert size={13} aria-hidden /> : level === "creator-reported" ? <UserRound size={13} aria-hidden /> : <ShieldCheck size={13} aria-hidden />;
+  const label = evidenceLevelInfo[level].label;
   return (
-    <span className={`evidence-badge evidence-${level}`} title={evidenceLabels[level]}>
+    <span className={`evidence-badge evidence-${level} ${demo && level !== "demo" ? "evidence-on-demo" : ""}`}>
       {icon}
-      {compact ? evidenceLabels[level].replace(" / synthetic", "") : evidenceLabels[level]}
+      {compact ? label.replace(" / illustrative", "") : label}
+      {demo && level !== "demo" ? " · demo" : ""}
     </span>
   );
 }
 
-export function StalenessBadge({ state }: { state: ImplementationRecord["stalenessState"] | Blueprint["compatibilityState"] }) {
+export function StalenessBadge({ state }: { state: StalenessState }) {
   return (
     <span className={`staleness-badge staleness-${state}`}>
-      <Clock3 size={13} />
-      {state.replaceAll("-", " ")}
+      <Clock3 size={13} aria-hidden />
+      {stalenessLabels[state]}
     </span>
   );
 }
+
+export function RightsBadge({ rights }: { rights: ReuseRights }) {
+  return (
+    <span className={`rights-badge rights-${rights}`}>
+      <FileKey2 size={13} aria-hidden />
+      {rightsCatalogue[rights].label}
+    </span>
+  );
+}
+
+const relationshipLabels: Record<TechnologyRelationshipType, string> = {
+  "native-integration": "Native integration",
+  "api-compatible": "API compatible",
+  "webhook-compatible": "Webhook compatible",
+  "connector-available": "Connector available",
+  "requires-middleware": "Requires middleware",
+  "custom-integration-required": "Custom integration required",
+  "observed-together": "Observed together — not verified compatibility",
+  incompatible: "Incompatible",
+  unknown: "Unknown",
+};
+
+export function RelationshipTypeBadge({ type }: { type: TechnologyRelationshipType }) {
+  return <span className={`relationship-badge relationship-${type}`}>{relationshipLabels[type]}</span>;
+}
+
+export function IllustrativeNotice({ children }: { children?: ReactNode }) {
+  return (
+    <div className="illustrative-notice" role="note">
+      <TriangleAlert size={18} aria-hidden />
+      <p>
+        <strong>ILLUSTRATIVE RECORD.</strong>{" "}
+        {children ?? "Fictional business and synthetic values that demonstrate the evidence model. Not a real customer, outcome or verification."}
+      </p>
+    </div>
+  );
+}
+
+function costLabel(record: ImplementationRecord) {
+  if (record.costDisclosureType === "not-disclosed") return "Setup cost not disclosed";
+  const low = record.implementationCostLow ?? record.implementationCost;
+  const high = record.implementationCostHigh ?? record.implementationCost;
+  if (low == null) return "Setup cost not disclosed";
+  const range = low === high || high == null ? `£${low.toLocaleString("en-GB")}` : `£${low.toLocaleString("en-GB")}–£${high.toLocaleString("en-GB")}`;
+  return `${range} setup${record.demo ? " (illustrative)" : ""}`;
+}
+export { costLabel as implementationCostLabel };
 
 export function ImplementationCard({
   implementation,
   context,
   metrics = [],
   metricDefinitions = [],
+  freshness,
   similarity,
+  compare,
 }: {
   implementation: ImplementationRecord;
   context?: ImplementationContext;
   metrics?: ImplementationMetric[];
   metricDefinitions?: MetricDefinition[];
-  similarity?: Pick<ContextSimilarity, "level" | "score" | "reasons">;
+  freshness?: StalenessState;
+  similarity?: ContextSimilarity;
+  compare?: { selected: boolean; disabled: boolean; toggle: () => void };
 }) {
-  const responseMetric = metrics.find((metric) => metric.metricDefinitionId === "first-response-time");
-  const bookingMetric = metrics.find((metric) => metric.metricDefinitionId === "booking-rate");
-  const metricName = (id: string) => metricDefinitions.find((definition) => definition.id === id)?.name ?? id;
+  const highlights = ["first-response-time", "missed-enquiry-rate", "booking-rate", "qualified-lead-rate"]
+    .map((id) => metrics.find((metric) => metric.metricDefinitionId === id && metric.baselineValue != null && metric.observedValue != null))
+    .filter((metric): metric is ImplementationMetric => !!metric)
+    .slice(0, 2);
+  const definition = (id: string) => metricDefinitions.find((item) => item.id === id);
   return (
     <article className="card implementation-card">
       <div className="implementation-card-top">
         <div className="row wrap">
           <Badge>{implementation.demo ? "ILLUSTRATIVE RECORD" : "IMPLEMENTATION"}</Badge>
           <EvidenceBadge level={implementation.verificationState} compact />
-          <StalenessBadge state={implementation.stalenessState} />
+          <StalenessBadge state={freshness ?? implementationFreshness(implementation, new Date()).state} />
         </div>
-        <SaveButton id={implementation.id} name={implementation.name} type="implementation" />
+        <div className="row implementation-card-actions">
+          {compare && (
+            <label className="compare-check">
+              <input type="checkbox" checked={compare.selected} disabled={compare.disabled && !compare.selected} onChange={compare.toggle} />
+              Compare
+            </label>
+          )}
+          <SaveButton id={implementation.id} name={implementation.name} type="implementation" />
+        </div>
       </div>
       <Link to={`/implementations/${implementation.slug}`} className="implementation-card-title">
         <h3>{implementation.name}</h3>
-        <ArrowRight size={17} />
+        <ArrowRight size={17} aria-hidden />
       </Link>
       <p>{implementation.summary}</p>
       <dl className="implementation-context-strip">
-        <div>
-          <dt>Business</dt>
-          <dd>{implementation.businessType}</dd>
-        </div>
-        <div>
-          <dt>Size</dt>
-          <dd>{implementation.organizationSizeBand}</dd>
-        </div>
-        <div>
-          <dt>Volume</dt>
-          <dd>{context?.volumeLabel ?? "Not disclosed"}</dd>
-        </div>
+        <div><dt>Business</dt><dd>{implementation.businessType}</dd></div>
+        <div><dt>Locations</dt><dd>{context?.locations ?? "Not disclosed"}</dd></div>
+        <div><dt>Volume / month</dt><dd>{context?.monthlyVolumeMin != null ? `${context.monthlyVolumeMin.toLocaleString("en-GB")}–${(context.monthlyVolumeMax ?? context.monthlyVolumeMin).toLocaleString("en-GB")}` : "Not disclosed"}</dd></div>
       </dl>
-      {(responseMetric || bookingMetric) && (
+      {!!highlights.length && (
         <div className="implementation-outcomes-inline">
-          {[responseMetric, bookingMetric].filter(Boolean).map((metric) => (
-            <div key={metric!.id}>
-              <small>{metricName(metric!.metricDefinitionId)}</small>
+          {highlights.map((metric) => (
+            <div key={metric.id}>
+              <small>{definition(metric.metricDefinitionId)?.name ?? metric.name}</small>
               <strong>
-                {metric!.baselineValue ?? "—"} → {metric!.observedValue ?? "—"} {metric!.unit}
+                {formatMetricValue(metric.baselineValue, metric.unit)} → {formatMetricValue(metric.observedValue, metric.unit)}
               </strong>
-              <span>illustrative observed comparison</span>
+              <span>baseline → observed{implementation.demo ? " · illustrative" : ""}</span>
             </div>
           ))}
         </div>
       )}
       {similarity && (
         <div className={`similarity-pill similarity-${similarity.level}`}>
-          <GitBranch size={15} />
-          <strong>{similarity.level} context similarity</strong>
-          <span>{similarity.score}/100</span>
+          <GitBranch size={15} aria-hidden />
+          <strong>{similarity.level[0].toUpperCase() + similarity.level.slice(1)} context similarity</strong>
         </div>
       )}
       <div className="card-foot implementation-card-foot">
-        <span>
-          {implementation.implementationDuration} · {implementation.region}
-        </span>
-        <strong>
-          {implementation.implementationCost == null
-            ? "Cost not disclosed"
-            : `${implementation.implementationCostCurrency} ${implementation.implementationCost.toLocaleString()} illustrative setup`}
-        </strong>
+        <span>{implementation.implementationDuration} · {implementation.region}</span>
+        <strong>{costLabel(implementation)}</strong>
       </div>
     </article>
   );
@@ -161,74 +196,217 @@ export function ImplementationCard({
 export function MetricCard({
   metric,
   definition,
-  onEvidence,
+  period,
+  demo,
+  onProvenance,
 }: {
   metric: ImplementationMetric;
   definition?: MetricDefinition;
-  onEvidence?: () => void;
+  period?: MeasurementPeriod;
+  demo: boolean;
+  onProvenance: () => void;
 }) {
-  const delta = metric.percentageChange;
+  const change = metricChange(metric.baselineValue, metric.observedValue, metric.unit, definition?.direction);
   return (
     <article className="metric-card card">
-      <div className="row between">
-        <div>
-          <small>{definition?.category ?? "Observed metric"}</small>
-          <h3>{definition?.name ?? metric.name}</h3>
-        </div>
+      <div className="row between metric-card-head">
+        <h3>{definition?.name ?? metric.name}</h3>
         <EvidenceBadge level={metric.evidenceLevel} compact />
       </div>
-      <div className="metric-values">
+      <div className="metric-values" role="group" aria-label={`${definition?.name ?? metric.name}: baseline ${formatMetricValue(metric.baselineValue, metric.unit)}, observed ${formatMetricValue(metric.observedValue, metric.unit)}`}>
         <div>
           <span>Baseline</span>
-          <strong>{metric.baselineValue == null ? "—" : `${metric.baselineValue} ${metric.unit}`}</strong>
+          <strong>{formatMetricValue(metric.baselineValue, metric.unit)}</strong>
         </div>
-        <ArrowRight size={20} />
+        <ArrowRight size={18} aria-hidden />
         <div>
           <span>Observed after implementation</span>
-          <strong>{metric.observedValue == null ? "—" : `${metric.observedValue} ${metric.unit}`}</strong>
+          <strong>{formatMetricValue(metric.observedValue, metric.unit)}</strong>
         </div>
       </div>
-      {delta != null && (
-        <p className="metric-delta">
-          {delta > 0 ? "+" : ""}{delta.toFixed(1)}% relative change · observation, not causal attribution
-        </p>
-      )}
-      <div className="metric-source">
-        <span>{metric.sourceLabel}</span>
-        {onEvidence && (
-          <button type="button" className="text-button" onClick={onEvidence}>
-            See provenance <ArrowRight size={14} />
-          </button>
+      <p className="metric-delta">
+        {describeChange(change, metric.unit)}
+        {change.inPreferredDirection != null && (
+          <span> {change.inPreferredDirection ? "In the metric’s preferred direction." : "Against the metric’s preferred direction."}</span>
         )}
-      </div>
+      </p>
+      <dl className="metric-meta">
+        <div><dt>Period</dt><dd>{period?.startDate && period.endDate ? `${period.startDate} → ${period.endDate}` : "Not recorded"}</dd></div>
+        <div><dt>Source</dt><dd>{metric.sourceLabel}{demo ? " (illustrative)" : ""}</dd></div>
+      </dl>
+      <button type="button" className="text-button metric-provenance-button" onClick={onProvenance}>
+        Provenance &amp; evidence <ArrowRight size={14} aria-hidden />
+      </button>
     </article>
+  );
+}
+
+export function MetricProvenanceDrawer({
+  metric,
+  definition,
+  periods,
+  claims,
+  links,
+  artifacts,
+  reviews,
+  demo,
+  onClose,
+}: {
+  metric: ImplementationMetric | null;
+  definition?: MetricDefinition;
+  periods: MeasurementPeriod[];
+  claims: Claim[];
+  links: ClaimEvidence[];
+  artifacts: EvidenceArtifact[];
+  reviews: EvidenceReview[];
+  demo: boolean;
+  onClose: () => void;
+}) {
+  const claim = metric ? claims.find((item) => item.subjectType === "metric" && item.subjectId === metric.id) : undefined;
+  const observed = periods.find((period) => period.id === metric?.measurementPeriodId);
+  const baseline = periods.find((period) => period.kind === "baseline");
+  return (
+    <Drawer open={!!metric} onClose={onClose} title={metric ? `Provenance: ${definition?.name ?? metric.name}` : "Provenance"} description="How this value was produced, who claims it and what supports it.">
+      {metric && (
+        <div className="provenance-panel">
+          {demo && <IllustrativeNotice>This value is synthetic. The panel shows what a real record would expose.</IllustrativeNotice>}
+          <dl className="detail-list">
+            <div><dt>Definition</dt><dd>{definition?.calculationMethod ?? "Not recorded"}</dd></div>
+            <div><dt>Unit</dt><dd>{metric.unit}</dd></div>
+            <div><dt>Baseline</dt><dd>{formatMetricValue(metric.baselineValue, metric.unit)} {baseline?.startDate ? `(${baseline.startDate} → ${baseline.endDate})` : ""}</dd></div>
+            <div><dt>Observed</dt><dd>{formatMetricValue(metric.observedValue, metric.unit)} {observed?.startDate ? `(${observed.startDate} → ${observed.endDate})` : ""}</dd></div>
+            <div><dt>Comparison rule</dt><dd>{definition?.comparisonRules ?? "Not recorded"}</dd></div>
+          </dl>
+          {claim ? <ClaimDetail claim={claim} links={links} artifacts={artifacts} reviews={reviews} /> : <p className="muted">No claim is attached to this value — treat it as unverified.</p>}
+          <p className="muted small-print">Observed after implementation. This does not show that the implementation caused the change, and it is not a forecast for another business.</p>
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
+/** Numeric claim values are formatted with their unit; text claims are shown verbatim. */
+export function claimValue(claim: Pick<Claim, "value" | "unit">) {
+  const numeric = claim.value.trim() !== "" && !Number.isNaN(Number(claim.value));
+  return numeric && claim.unit ? formatMetricValue(Number(claim.value), claim.unit) : claim.value;
+}
+
+function ClaimDetail({ claim, links, artifacts, reviews }: { claim: Claim; links: ClaimEvidence[]; artifacts: EvidenceArtifact[]; reviews: EvidenceReview[] }) {
+  const signals = evidenceSignals(claim, links, artifacts, reviews, new Date());
+  const linked = links.filter((link) => link.claimId === claim.id);
+  const claimReviews = reviews.filter((review) => review.claimId === claim.id);
+  return (
+    <div className="claim-detail">
+      <div className="row wrap">
+        <EvidenceBadge level={claim.evidenceLevel} demo={claim.provenance === "demo"} />
+        <span className="badge">{claim.status}</span>
+      </div>
+      <dl className="detail-list">
+        <div><dt>Claim</dt><dd>{claimValue(claim)}</dd></div>
+        <div><dt>Claimant</dt><dd>{claim.claimant}{claim.claimantType ? ` (${claim.claimantType})` : ""}</dd></div>
+        <div><dt>Evidence method</dt><dd>{claim.evidenceMethod ?? "Not stated"}</dd></div>
+        <div><dt>Evidence level</dt><dd>{evidenceLevelInfo[claim.evidenceLevel].description}</dd></div>
+        <div><dt>Period</dt><dd>{claim.period ?? "Not applicable"}</dd></div>
+        <div><dt>Last reviewed</dt><dd>{claim.reviewedAt?.slice(0, 10) ?? "Never"}</dd></div>
+        <div><dt>Limitations</dt><dd>{signals.limitations.join(" ") || "None recorded"}</dd></div>
+      </dl>
+      <div className="signal-grid" aria-label="Evidence signals">
+        <span><small>Independence</small>{signals.independence}</span>
+        <span><small>Directness</small>{signals.directness}</span>
+        <span><small>Freshness</small>{stalenessLabels[signals.freshness]}</span>
+        <span><small>Review</small>{signals.reviewStatus.replaceAll("-", " ")}</span>
+        <span><small>Specificity</small>{signals.specificity}</span>
+      </div>
+      {!!linked.length && (
+        <ul className="evidence-artifact-list">
+          {linked.map((link) => {
+            const artifact = artifacts.find((item) => item.id === link.evidenceArtifactId);
+            if (!artifact) return null;
+            return (
+              <li key={link.id}>
+                {artifact.private ? <LockKeyhole size={15} aria-label="Private" /> : <Eye size={15} aria-label="Public" />}
+                <span>
+                  <strong>{artifact.name}</strong>
+                  <small>{link.relationship} · {artifact.kind.replaceAll("-", " ")} · {artifact.private ? "file private to reviewers" : "public"}</small>
+                  <small>{artifact.publicMetadata}</small>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {claimReviews.map((review) => (
+        <p key={review.id} className="review-note"><ShieldCheck size={15} aria-hidden /> Review {review.reviewedAt.slice(0, 10)}: {review.result.replaceAll("-", " ")} — {review.notes}</p>
+      ))}
+    </div>
+  );
+}
+
+export function ClaimsPanel({
+  claims,
+  links,
+  artifacts,
+  reviews,
+}: {
+  claims: Claim[];
+  links: ClaimEvidence[];
+  artifacts: EvidenceArtifact[];
+  reviews: EvidenceReview[];
+}) {
+  const [open, setOpen] = useState<Claim | null>(null);
+  const visible = claims.filter((claim) => claim.public);
+  return (
+    <>
+      <div className="claim-list" role="list">
+        {visible.map((claim) => (
+          <div className="claim-row card" role="listitem" key={claim.id}>
+            <div>
+              <strong>{claim.name}</strong>
+              <small>{claimValue(claim)}</small>
+            </div>
+            <div className="claim-row-meta">
+              <span className="muted">{claim.claimant}</span>
+              <EvidenceBadge level={claim.evidenceLevel} compact demo={claim.provenance === "demo"} />
+              <button type="button" className="text-button" onClick={() => setOpen(claim)} aria-label={`Evidence for ${claim.name}`}>
+                Evidence <ArrowRight size={14} aria-hidden />
+              </button>
+            </div>
+          </div>
+        ))}
+        {!visible.length && <p className="muted">No public claims recorded.</p>}
+      </div>
+      <Drawer open={!!open} onClose={() => setOpen(null)} title={open?.name ?? "Claim"} description="Claim-level evidence. No record-wide verification tick.">
+        {open && <ClaimDetail claim={open} links={links} artifacts={artifacts} reviews={reviews} />}
+      </Drawer>
+    </>
   );
 }
 
 export function BeforeAfterProcess({ steps }: { steps: ImplementationProcessStep[] }) {
   const columns = (["before", "change", "after"] as const).map((phase) => ({
     phase,
-    title: phase === "before" ? "Before" : phase === "change" ? "Process change" : "After",
+    title: phase === "before" ? "Before" : phase === "change" ? "What changed" : "After",
     items: steps.filter((step) => step.phase === phase).sort((a, b) => a.position - b.position),
   }));
   return (
     <div className="before-after-grid">
       {columns.map((column) => (
-        <section className={`card process-column process-${column.phase}`} key={column.phase}>
+        <section className={`card process-column process-${column.phase}`} key={column.phase} aria-label={`${column.title} process`}>
           <div className="process-heading">
-            {column.phase === "before" ? <Clock3 size={20} /> : column.phase === "change" ? <Workflow size={20} /> : <CheckCircle2 size={20} />}
+            {column.phase === "before" ? <Clock3 size={20} aria-hidden /> : column.phase === "change" ? <Workflow size={20} aria-hidden /> : <CheckCircle2 size={20} aria-hidden />}
             <h3>{column.title}</h3>
           </div>
           <ol>
             {column.items.map((step) => (
-              <li key={step.id}>
-                <span>{step.position + 1}</span>
+              <li key={step.id} className={/human/i.test(step.humanRole) ? "human-step" : ""}>
+                <span aria-hidden>{step.position + 1}</span>
                 <div>
                   <strong>{step.description}</strong>
-                  <small>{step.humanRole}</small>
+                  {column.phase !== "change" && <small>{step.humanRole}</small>}
                 </div>
               </li>
             ))}
+            {!column.items.length && <li><div><strong>Not recorded</strong></div></li>}
           </ol>
         </section>
       ))}
@@ -236,117 +414,23 @@ export function BeforeAfterProcess({ steps }: { steps: ImplementationProcessStep
   );
 }
 
-export function ImplementationArchitecture({
-  items,
-  connections,
-  products,
-  kind = "observed",
-}: {
-  items: ImplementationStackItem[];
-  connections: ImplementationConnection[];
-  products: Product[];
-  kind?: "observed" | "reference";
-}) {
-  const [selected, setSelected] = useState(items[0]?.id ?? "");
-  const selectedItem = items.find((item) => item.id === selected);
-  const selectedProduct = products.find((product) => product.id === selectedItem?.productId);
-  return (
-    <div className="architecture-shell card">
-      <div className="architecture-head">
-        <div>
-          <span className="eyebrow">{kind === "observed" ? "OBSERVED ARCHITECTURE" : "REFERENCE ARCHITECTURE"}</span>
-          <h3>Component and data-flow map</h3>
-        </div>
-        <Badge>{kind === "observed" ? "Recorded configuration" : "Reusable pattern"}</Badge>
-      </div>
-      <div className="architecture-flow" role="list" aria-label="Architecture components">
-        {items.map((item, index) => {
-          const product = products.find((candidate) => candidate.id === item.productId);
-          const connection = connections.find((candidate) => candidate.fromItemId === item.id);
-          return (
-            <div className="architecture-flow-unit" key={item.id}>
-              <button
-                type="button"
-                role="listitem"
-                className={`architecture-node ${selected === item.id ? "selected" : ""}`}
-                onClick={() => setSelected(item.id)}
-                aria-pressed={selected === item.id}
-              >
-                {product ? <Logo initials={product.initials} color={product.color} /> : <span className="logo-tile sand">?</span>}
-                <span>
-                  <small>{item.role}</small>
-                  <strong>{product?.name ?? item.productId}</strong>
-                  <em>{item.capabilityId}</em>
-                </span>
-              </button>
-              {index < items.length - 1 && (
-                <div className="architecture-edge" aria-hidden="true">
-                  <ArrowRight size={18} />
-                  <small>{connection?.label ?? "handoff"}</small>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {selectedItem && (
-        <div className="architecture-inspector">
-          <div>
-            <strong>{selectedItem.role}</strong>
-            <p>{selectedProduct?.description ?? selectedItem.notes}</p>
-          </div>
-          <div className="row wrap">
-            <EvidenceBadge level={selectedItem.evidenceLevel} compact />
-            {selectedProduct && (
-              <Link to={`/technologies/${selectedProduct.slug}`}>
-                Technology profile <ArrowRight size={14} />
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-      <div className="architecture-mobile-list">
-        {items.map((item) => {
-          const product = products.find((candidate) => candidate.id === item.productId);
-          return (
-            <div key={`${item.id}-mobile`}>
-              <strong>{item.role}</strong>
-              <span>{product?.name ?? item.productId}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-export function ContextSummary({
-  implementation,
-  context,
-}: {
-  implementation: ImplementationRecord;
-  context?: ImplementationContext;
-}) {
+export function ContextSummary({ implementation, context }: { implementation: ImplementationRecord; context?: ImplementationContext }) {
   return (
     <div className="context-summary card">
-      <div className="row between">
-        <div>
-          <span className="eyebrow">BUSINESS CONTEXT</span>
-          <h2>What this record actually describes</h2>
-        </div>
-        <LockKeyhole size={22} />
-      </div>
       <p>{implementation.contextSummary}</p>
       <dl className="context-grid">
+        <div><dt>Industry</dt><dd>{implementation.industry}</dd></div>
         <div><dt>Business</dt><dd>{implementation.businessType}</dd></div>
         <div><dt>Size</dt><dd>{implementation.organizationSizeBand}</dd></div>
         <div><dt>Region</dt><dd>{implementation.region}</dd></div>
         <div><dt>Locations</dt><dd>{context?.locations ?? "Not disclosed"}</dd></div>
-        <div><dt>Volume</dt><dd>{context?.volumeLabel ?? "Not disclosed"}</dd></div>
-        <div><dt>Technical capability</dt><dd>{context?.technicalCapability ?? "Unknown"}</dd></div>
+        <div><dt>Volume / month</dt><dd>{context?.volumeLabel ?? "Not disclosed"}</dd></div>
+        <div><dt>In-house technical capability</dt><dd>{context?.technicalCapability ?? "Unknown"}</dd></div>
+        <div><dt>Regulatory context</dt><dd>{context?.regulatoryConstraints.join(", ") || "Not recorded"}</dd></div>
+        <div><dt>Customer identity</dt><dd>{implementation.customerIdentityVisibility === "public" ? implementation.customerDisplayName : implementation.customerIdentityVisibility === "anonymous" ? "Withheld publicly" : "Private to Oracnet"}</dd></div>
       </dl>
       {!!context?.existingSystems.length && (
-        <div className="tags">
+        <div className="tags" aria-label="Existing systems">
           {context.existingSystems.map((system) => <span key={system}>{system}</span>)}
         </div>
       )}
@@ -354,22 +438,25 @@ export function ContextSummary({
   );
 }
 
-export function ContextSimilarityPanel({ similarity }: { similarity: { level: "high" | "medium" | "low"; score: number; reasons: string[]; differences: string[] } }) {
+export function ContextSimilarityPanel({ similarity, title = "Context match" }: { similarity: ContextSimilarity; title?: string }) {
+  const label = similarity.level[0].toUpperCase() + similarity.level.slice(1);
   return (
     <div className={`card context-similarity context-similarity-${similarity.level}`}>
-      <div className="row between">
-        <div>
-          <span className="eyebrow">CONTEXT MATCH</span>
-          <h3>{similarity.level[0].toUpperCase() + similarity.level.slice(1)} similarity</h3>
-        </div>
-        <strong className="similarity-score">{similarity.score}/100</strong>
-      </div>
-      <div className="similarity-meter" aria-label={`Context similarity ${similarity.score} out of 100`}>
-        <span style={{ width: `${similarity.score}%` }} />
-      </div>
-      {similarity.reasons.map((reason) => <p key={reason}><CheckCircle2 size={15} /> {reason}</p>)}
-      {similarity.differences.map((difference) => <p className="muted" key={difference}><CircleHelp size={15} /> {difference}</p>)}
-      <small>Context similarity is deterministic matching, not a prediction of outcome.</small>
+      <span className="eyebrow">{title.toUpperCase()}</span>
+      <h3><span className={`level-dot level-${similarity.level}`} aria-hidden /> {label} contextual similarity</h3>
+      <p className="similarity-summary">{similaritySummary(similarity)}</p>
+      {similarity.reasons.length > 4 && (
+        <ul className="similarity-list" aria-label="Further similarities">
+          {similarity.reasons.slice(4).map((reason) => <li key={reason}><CheckCircle2 size={15} aria-hidden /> {reason}</li>)}
+        </ul>
+      )}
+      {!!similarity.differences.length && (
+        <ul className="similarity-list differences" aria-label="Differences">
+          {similarity.differences.map((difference) => <li key={difference}><CircleHelp size={15} aria-hidden /> Difference: {difference}</li>)}
+        </ul>
+      )}
+      {!!similarity.unknowns?.length && <small>Not compared (missing data): {similarity.unknowns.join(", ")}.</small>}
+      <small>Deterministic context matching. It does not predict that you will see the same outcome.</small>
     </div>
   );
 }
@@ -379,143 +466,64 @@ export function BlueprintCard({
   version,
   stackItems = [],
   products = [],
+  freshness,
 }: {
   blueprint: Blueprint;
   version?: BlueprintVersion;
   stackItems?: BlueprintStackItem[];
   products?: Product[];
+  freshness?: StalenessState;
 }) {
   return (
     <article className="card blueprint-card">
       <div className="row between">
-        <span className="category-icon sand"><Layers3 size={22} /></span>
+        <span className="category-icon sand"><Layers3 size={22} aria-hidden /></span>
         <div className="row wrap">
           <Badge>{blueprint.demo ? "DEMO BLUEPRINT" : "BLUEPRINT"}</Badge>
-          <StalenessBadge state={blueprint.compatibilityState} />
+          <StalenessBadge state={freshness ?? computeFreshness({ lastReviewedAt: version?.lastValidatedAt ?? blueprint.lastValidatedAt, archived: blueprint.compatibilityState === "archived" }, new Date(), freshnessPolicies.blueprintCompatibility).state} />
         </div>
       </div>
-      <Link to={`/blueprints/${blueprint.slug}`}>
-        <h3>{blueprint.name} <ArrowRight size={16} /></h3>
+      <Link to={`/blueprints/${blueprint.slug}`} className="blueprint-card-title">
+        <h3>{blueprint.name}</h3>
+        <ArrowRight size={16} aria-hidden />
       </Link>
       <p>{blueprint.description}</p>
-      <div className="blueprint-stack-mini">
-        {stackItems.slice(0, 5).map((item) => {
+      <div className="blueprint-stack-mini" aria-label="Capability slots">
+        {stackItems.map((item) => {
           const product = products.find((candidate) => candidate.id === item.productId);
-          return <span key={item.id}>{product?.name ?? item.role}</span>;
+          return <span key={item.id} title={capabilityLabel(item.capabilityId)}>{product?.name ?? item.role}{item.alternativeProductIds.length ? ` +${item.alternativeProductIds.length}` : ""}</span>;
         })}
       </div>
       <dl className="blueprint-meta">
         <div><dt>Version</dt><dd>{version?.version ?? "—"}</dd></div>
         <div><dt>Complexity</dt><dd>{blueprint.estimatedComplexity}</dd></div>
-        <div><dt>Reuse</dt><dd>{blueprint.reuseRights.replaceAll("-", " ")}</dd></div>
+        <div><dt>Reuse</dt><dd><RightsBadge rights={blueprint.reuseRights} /></dd></div>
       </dl>
     </article>
   );
 }
 
-export function ClaimEvidencePanel({ claims }: { claims: Claim[] }) {
+export function ProvenanceTimeline({ events }: { events: TimelineEvent[] }) {
+  if (!events.length) return <p className="muted">No provenance events recorded.</p>;
   return (
-    <div className="claim-list">
-      {claims.map((claim) => (
-        <article className="claim-row card" key={claim.id}>
+    <ol className="provenance-timeline">
+      {events.map((event, index) => (
+        <li key={`${event.at}-${index}`} className={`timeline-${event.kind}`}>
+          <time dateTime={event.at}>{event.at.slice(0, 10)}</time>
           <div>
-            <strong>{claim.name}</strong>
-            <small>{claim.predicate.replaceAll("-", " ")}</small>
+            <strong>{event.label}</strong>
+            <small>{event.detail}</small>
           </div>
-          <div className="claim-value">
-            <span>{claim.value}{claim.unit ? ` ${claim.unit}` : ""}</span>
-            <EvidenceBadge level={claim.evidenceLevel} compact />
-          </div>
-        </article>
+        </li>
       ))}
-    </div>
-  );
-}
-
-export function SolutionCandidateCard({
-  candidate,
-  items,
-  products,
-  explanations,
-}: {
-  candidate: SolutionCandidate;
-  items: SolutionCandidateItem[];
-  products: Product[];
-  explanations: SolutionExplanation[];
-}) {
-  const [open, setOpen] = useState(false);
-  const candidateItems = items.filter((item) => item.candidateId === candidate.id);
-  const candidateExplanations = explanations.filter((explanation) => explanation.candidateId === candidate.id);
-  const metrics = [
-    ["Complexity", 100 - candidate.complexity],
-    ["Evidence", candidate.evidenceStrength],
-    ["Maintainability", 100 - candidate.maintenanceBurden],
-    ["Flexibility", candidate.flexibility],
-  ] as const;
-  return (
-    <article className={`card solution-candidate ${candidate.dominated ? "solution-dominated" : ""}`}>
-      <div className="solution-candidate-head">
-        <div>
-          <Badge>{candidate.label}</Badge>
-          <h3>{candidate.name}</h3>
-          <p>{candidate.summary}</p>
-        </div>
-        <Scale size={24} />
-      </div>
-      <div className="candidate-products">
-        {candidateItems.map((item) => {
-          const product = products.find((candidateProduct) => candidateProduct.id === item.productId);
-          return (
-            <div key={item.id}>
-              {product ? <Logo initials={product.initials} color={product.color} /> : <span className="logo-tile sand">?</span>}
-              <span><small>{item.role}</small><strong>{product?.name ?? item.productId}</strong></span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="solution-tradeoffs">
-        {metrics.map(([label, value]) => (
-          <div key={label}>
-            <div className="row between"><span>{label}</span><strong>{Math.round(value)}</strong></div>
-            <div className="tradeoff-meter"><span style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></div>
-          </div>
-        ))}
-      </div>
-      <dl className="solution-economics">
-        <div><dt>Illustrative setup</dt><dd>{candidate.setupCost == null ? "Unknown" : `£${candidate.setupCost.toLocaleString()}`}</dd></div>
-        <div><dt>Illustrative monthly</dt><dd>{candidate.monthlyCost == null ? "Unknown" : `£${candidate.monthlyCost.toLocaleString()}`}</dd></div>
-      </dl>
-      <div className="row wrap solution-actions">
-        <button type="button" className="button light" onClick={() => setOpen(true)}>
-          Why this appears <ArrowRight size={16} />
-        </button>
-        {candidate.sourceBlueprintId && (
-          <ButtonLink to={`/blueprints/${candidate.sourceBlueprintId}`} variant="light">
-            Open blueprint <ExternalLink size={15} />
-          </ButtonLink>
-        )}
-      </div>
-      <Modal open={open} onClose={() => setOpen(false)} title={`Why ${candidate.name} appears`} description="Deterministic explanation from the recorded graph, constraints and evidence.">
-        <div className="solution-explanation-list">
-          {candidateExplanations.map((explanation) => (
-            <div key={explanation.id}>
-              {explanation.kind === "fit" ? <CheckCircle2 size={18} /> : explanation.kind === "unknown" ? <CircleHelp size={18} /> : <ShieldCheck size={18} />}
-              <div><strong>{explanation.name}</strong><p>{explanation.text}</p></div>
-            </div>
-          ))}
-          {!!candidate.risks.length && (
-            <div><TriangleAlert size={18} /><div><strong>Risks / limitations</strong>{candidate.risks.map((risk) => <p key={risk}>{risk}</p>)}</div></div>
-          )}
-        </div>
-      </Modal>
-    </article>
+    </ol>
   );
 }
 
 export function EvidencePrincipleNotice() {
   return (
     <div className="evidence-principle notice">
-      <DatabaseZap size={21} />
+      <DatabaseZap size={21} aria-hidden />
       <div>
         <strong>Implementation intelligence, not performance promises.</strong>
         <p>Oracnet records context, provenance and observed values. A result in one business is not a forecast or causal claim for another.</p>
@@ -527,47 +535,19 @@ export function EvidencePrincipleNotice() {
 export function CompilerEmptyState() {
   return (
     <div className="compiler-empty card">
-      <span className="category-icon sand"><Sparkles size={25} /></span>
+      <span className="category-icon sand"><Sparkles size={25} aria-hidden /></span>
       <h2>Build a requirement profile, not a prompt.</h2>
-      <p>Oracnet converts your business outcome into editable constraints, then checks structured implementation records and reference architectures.</p>
+      <p>Oracnet turns your description into editable requirement cards. You confirm each value, mark what is a hard requirement, and the engine checks recorded implementations and Blueprints.</p>
     </div>
   );
 }
 
-export function BlueprintArchitecture({
-  blueprint,
-  version,
-  items,
-  products,
-}: {
-  blueprint: Blueprint;
-  version?: BlueprintVersion;
-  items: BlueprintStackItem[];
-  products: Product[];
-}) {
-  const ordered = useMemo(() => items.filter((item) => !version || item.blueprintVersionId === version.id), [items, version]);
+export function SectionIntro({ eyebrow, title, children, id }: { eyebrow: string; title: string; children?: ReactNode; id?: string }) {
   return (
-    <div className="card blueprint-dependency-view">
-      <div className="row between">
-        <div><span className="eyebrow">VERSIONED DEPENDENCY MANIFEST</span><h3>{blueprint.name}</h3></div>
-        <Badge>v{version?.version ?? "—"}</Badge>
-      </div>
-      <div className="dependency-steps">
-        {ordered.map((item, index) => {
-          const product = products.find((candidate) => candidate.id === item.productId);
-          return (
-            <div className="dependency-step" key={item.id}>
-              <span className="dependency-number">{index + 1}</span>
-              <div>
-                <small>{item.capabilityId}</small>
-                <strong>{product?.name ?? item.role}</strong>
-                <p>{item.configurationRequirements}</p>
-                {!!item.alternativeProductIds.length && <span>Alternatives recorded: {item.alternativeProductIds.map((id) => products.find((p) => p.id === id)?.name ?? id).join(", ")}</span>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+    <div className="section-title-text" id={id}>
+      <span className="eyebrow">{eyebrow}</span>
+      <h2>{title}</h2>
+      {children && <p>{children}</p>}
     </div>
   );
 }

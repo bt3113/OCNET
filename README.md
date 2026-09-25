@@ -45,6 +45,8 @@ npm run preview
 npm audit
 ```
 
+Locally, if the installed Playwright build does not match the preinstalled browser, set `CHROMIUM_EXECUTABLE_PATH` to a Chromium binary.
+
 The end-to-end suite checks routes, search, filtering, persistence, comparison, project creation, contact/messaging, listing edits, reviews, notifications, settings, axe accessibility, and viewport overflow at 1440, 1280, 1024, 768, 430, 390, and 360 pixels. Screenshots go to ignored `qa/`. Audit and QA notes are in `docs/qa.md`.
 
 ## GitHub Pages
@@ -63,9 +65,23 @@ Move to a host supporting server-rendered entity metadata, security headers and 
 - [Deployment](docs/deployment.md)
 - [Security / threat model](docs/security.md)
 - [QA evidence and limits](docs/qa.md)
+- [Implementation intelligence](docs/implementation-intelligence.md) · [records](docs/implementation-records.md) · [metrics](docs/metric-model.md) · [verification](docs/verification-model.md) · [provenance](docs/provenance-model.md) · [Blueprints](docs/blueprints.md) · [Solution Compiler](docs/solution-compiler.md)
+- [Production architecture](docs/production-architecture.md) · [research notes](docs/technical-research-notes.md) · [progress and open gaps](docs/implementation-progress.md)
 
 ## Builds and creators
 
 The marketplace now connects outcomes to creator-published **Builds**: concrete implementation blueprints, technology stacks, architecture diagrams, evidence, reuse permissions and offers. Procurement Projects remain separate. Explore six clearly labelled examples, publish your own browser-local Build, remix permitted blueprints, compare Builds, organize private collections, and contact creators in demo messages. Accounts support multiple roles.
 
 The nine-step publisher supports public GitHub import, manual entry, original media, use cases, confirmed technologies, architecture, implementation/license details, offers and review. Connected publication enters moderation. Creator, provider and admin workspaces extend the same interface. See [Build marketplace](docs/build-marketplace.md) for routes, permissions, import boundaries and production prerequisites. The relational migration, optional Auth-bound seed, full-text search and PostgreSQL RLS tests accompany the frontend.
+
+## Implementation intelligence
+
+Oracnet records what was actually implemented, for whom (in anonymised context), with which technologies, and what was observed afterwards — with evidence at the level of individual claims.
+
+- **Implementation Records** (`/implementations`, `/implementations/:slug`, `/compare/implementations`): context, before/after process, architecture map, metrics observed after implementation (never presented as caused by it), claim-level evidence states, freshness, provenance and PROV-JSON export.
+- **Blueprints** (`/blueprints`): reusable, sanitized architecture patterns with explicit rights states, versions and CycloneDX 1.7 / SPDX 2.3 manifests. A public record never grants reuse rights.
+- **Solution Compiler** (`/solution-compiler`): a deterministic, non-chat engine. Requirements (HARD/SOFT/INFORMATIONAL) are compiled against Blueprint capability slots and typed technology relationships; infeasible options are excluded with reasons, remaining options are Pareto-filtered, labelled with trade-offs only (no “best stack”), and shipped with a reproducible decision trace.
+- **Verification** (`/verify/:token`): scoped, expiring, single-use customer attestation of selected claims; tokens are stored hashed. Reviewer decisions are per claim and audited.
+- **Contribution** (`/implementation/new`): a 15-step wizard with private customer identity, evidence upload, sanitization scanning and optional Blueprint derivation. Submissions enter moderation.
+
+All implementation records, Blueprints, implementers and outcomes in the demo are **illustrative** and labelled as such; none describes a real customer, deployment or result. Connected mode relies on migrations `202609250001`–`202609250004` and the `attestation` and `evidence` Edge Functions, which have not been exercised against a provisioned project.

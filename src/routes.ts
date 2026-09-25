@@ -74,6 +74,7 @@ export const adminRoutes = [
   "/admin/blueprints",
   "/admin/compatibility",
   "/admin/staleness",
+  "/admin/audit",
   "/admin/users",
   "/admin/providers",
   "/admin/listings",

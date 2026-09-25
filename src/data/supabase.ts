@@ -72,6 +72,7 @@ const normalized = new Set([
   "solution_candidate_items",
   "solution_explanations",
   "staleness_reviews",
+  "implementation_fingerprints",
 ]);
 export const repository: Repository = {
   async list<K extends Table>(table: K): Promise<Tables[K][]> {

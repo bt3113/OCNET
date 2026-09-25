@@ -1,628 +1,492 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  FileKey2,
-  LockKeyhole,
-  Save,
-  ShieldCheck,
-} from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Check, Eye, LockKeyhole, Plus, Save, ShieldAlert, Trash2 } from "lucide-react";
 import { PageHeading } from "../components/layout";
-import { Badge, Skeleton } from "../components/ui";
-import { useActions, useRecords, useUI } from "../state";
+import { Badge, ErrorState, Skeleton } from "../components/ui";
+import { AttestationInviteDialog } from "../components/attestation";
+import { useActions, useUI } from "../state";
+import { useIntelligence } from "../data/intelligence-hooks";
 import { isSupabase } from "../data/repository";
-import type {
-  CustomerIdentityVisibility,
-  ImplementationRecord,
-  ReuseRights,
-} from "../data/intelligence-model";
+import { blueprintScan, buildSubmission, emptyDraft, lines, proposedClaims, recordScan, validateStep, type ContributionDraft, type Submission } from "../data/contribution";
+import { sanitizationChecklist } from "../data/sanitization";
+import { rightsCatalogue } from "../data/rights";
+import { capabilityLabel, capabilityLabels, sizeBands } from "../data/taxonomy";
+import type { EvidenceArtifact, ReuseRights } from "../data/intelligence-model";
 
 const steps = [
-  "Customer / context",
+  "Customer & identity",
+  "Business context",
   "Problem & baseline",
-  "Existing process",
-  "Process change",
-  "Architecture",
-  "Technology stack",
+  "Before process",
+  "Process changes",
+  "After process",
+  "Architecture & stack",
   "Timeline & economics",
-  "Outcomes / measurement",
+  "Observed outcomes",
+  "Claims",
   "Evidence",
   "Rights & confidentiality",
   "Customer attestation",
   "Blueprint derivation",
-  "Review & publish",
+  "Review & submit",
 ] as const;
+const draftKey = "oracnet:implementation-draft:v2";
 
-interface Draft {
-  name: string;
-  summary: string;
-  businessType: string;
-  industry: string;
-  organizationSizeBand: string;
-  region: string;
-  locations: number | null;
-  monthlyVolume: number | null;
-  contextSummary: string;
-  existingSystems: string;
-  technicalCapability: "none" | "basic" | "intermediate" | "advanced";
-  problem: string;
-  baselineFirstResponse: number | null;
-  beforeProcess: string;
-  processChange: string;
-  afterProcess: string;
-  stackProductIds: string[];
-  implementationDuration: string;
-  implementationCost: number | null;
-  ongoingMonthlyCost: number | null;
-  maintenanceHours: number | null;
-  observedFirstResponse: number | null;
-  observedManualHours: number | null;
-  baselineManualHours: number | null;
-  measurementNotes: string;
-  evidenceDescription: string;
-  evidenceKind: "customer-attestation" | "analytics-export" | "screenshot" | "system-log" | "deployment-documentation" | "public-case-study" | "other";
-  customerIdentityVisibility: CustomerIdentityVisibility;
-  rightsState: ReuseRights;
-  permissionConfirmed: boolean;
-  attestationRequested: boolean;
-  blueprintRequested: boolean;
-  blueprintName: string;
-  ownershipConfirmed: boolean;
+function Scope({ kind }: { kind: "public" | "private" }) {
+  return kind === "public" ? (
+    <span className="field-scope public"><Eye size={12} aria-hidden /> PUBLIC</span>
+  ) : (
+    <span className="field-scope private"><LockKeyhole size={12} aria-hidden /> PRIVATE VERIFICATION DATA</span>
+  );
 }
 
-const initialDraft: Draft = {
-  name: "",
-  summary: "",
-  businessType: "Service business",
-  industry: "Business services",
-  organizationSizeBand: "1–10 employees",
-  region: "United Kingdom",
-  locations: 1,
-  monthlyVolume: null,
-  contextSummary: "",
-  existingSystems: "",
-  technicalCapability: "none",
-  problem: "",
-  baselineFirstResponse: null,
-  beforeProcess: "",
-  processChange: "",
-  afterProcess: "",
-  stackProductIds: [],
-  implementationDuration: "",
-  implementationCost: null,
-  ongoingMonthlyCost: null,
-  maintenanceHours: null,
-  observedFirstResponse: null,
-  observedManualHours: null,
-  baselineManualHours: null,
-  measurementNotes: "",
-  evidenceDescription: "",
-  evidenceKind: "other",
-  customerIdentityVisibility: "anonymous",
-  rightsState: "showcase-only",
-  permissionConfirmed: false,
-  attestationRequested: false,
-  blueprintRequested: false,
-  blueprintName: "",
-  ownershipConfirmed: false,
-};
+function Field({ label, scope, children, help }: { label: string; scope?: "public" | "private"; children: ReactNode; help?: string }) {
+  return (
+    <label className="wizard-field">
+      <span className="wizard-field-label">{label} {scope && <Scope kind={scope} />}</span>
+      {children}
+      {help && <small className="muted">{help}</small>}
+    </label>
+  );
+}
 
-const draftKey = "oracnet:implementation-draft:v1";
+const num = (value: string) => (value === "" ? null : Number(value));
 
 export default function ImplementationWizard() {
-  const navigate = useNavigate();
   const { userId, notify } = useUI();
   const actions = useActions();
-  const { data: products = [], isLoading } = useRecords("products");
+  const data = useIntelligence();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [draft, setDraft] = useState<Draft>(() => {
-    if (typeof window === "undefined") return initialDraft;
-    const stored = localStorage.getItem(draftKey);
-    if (!stored) return initialDraft;
+  const [done, setDone] = useState<Submission | null>(null);
+  const [invite, setInvite] = useState(false);
+  const [draft, setDraft] = useState<ContributionDraft>(() => {
     try {
-      return { ...initialDraft, ...(JSON.parse(stored) as Partial<Draft>) };
+      const stored = localStorage.getItem(draftKey);
+      return stored ? { ...emptyDraft, ...(JSON.parse(stored) as Partial<ContributionDraft>) } : emptyDraft;
     } catch {
-      return initialDraft;
+      return emptyDraft;
     }
   });
-
+  const [savedAt, setSavedAt] = useState<string | null>(null);
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      localStorage.setItem(draftKey, JSON.stringify(draft));
-    }, 250);
-    return () => window.clearTimeout(timeout);
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(draft));
+        setSavedAt(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
+      } catch {
+        // Autosave is best-effort.
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [draft]);
+  const templateMetrics = useMemo(() => data.definitions.filter((definition) => definition.category === "service-enquiry-booking" && !["implementation-cost", "monthly-software-cost", "maintenance-hours"].includes(definition.id)), [data.definitions]);
 
-  const selectedProducts = useMemo(
-    () => products.filter((product) => draft.stackProductIds.includes(product.id)),
-    [products, draft.stackProductIds],
-  );
+  if (data.isLoading) return <Skeleton />;
+  if (data.isError) return <ErrorState retry={data.refetch} />;
 
-  if (isLoading) return <Skeleton />;
+  const patch = <K extends keyof ContributionDraft>(key: K, value: ContributionDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
+  const error = validateStep(step, draft);
+  const next = () => {
+    if (error) {
+      notify(error);
+      return;
+    }
+    setStep((current) => Math.min(steps.length - 1, current + 1));
+    requestAnimationFrame(() => document.getElementById("wizard-step-title")?.focus());
+  };
+  const claims = proposedClaims(draft, data.definitions);
+  const recordFindings = recordScan(draft);
+  const blueprintFindings = blueprintScan(draft);
 
-  function patch<K extends keyof Draft>(key: K, value: Draft[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
-  }
-
-  function lines(value: string) {
-    return value
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  function validateCurrentStep() {
-    if (step === 0 && (draft.name.trim().length < 5 || draft.contextSummary.trim().length < 20)) {
-      notify("Add a clear implementation name and business context.");
-      return false;
+  async function submit() {
+    const firstInvalid = steps.findIndex((_, index) => validateStep(index, draft));
+    if (firstInvalid >= 0) {
+      setStep(firstInvalid);
+      notify(validateStep(firstInvalid, draft)!);
+      return;
     }
-    if (step === 1 && draft.problem.trim().length < 20) {
-      notify("Describe the original problem and baseline context.");
-      return false;
-    }
-    if (step === 2 && !lines(draft.beforeProcess).length) {
-      notify("Record at least one step in the existing process.");
-      return false;
-    }
-    if (step === 3 && !lines(draft.afterProcess).length) {
-      notify("Record the process after implementation.");
-      return false;
-    }
-    if (step === 5 && draft.stackProductIds.length < 2) {
-      notify("Select at least two recorded technology components.");
-      return false;
-    }
-    if (step === 9 && !draft.permissionConfirmed) {
-      notify("Confirm that you have permission to publish the information entered here.");
-      return false;
-    }
-    if (step === 12 && !draft.ownershipConfirmed) {
-      notify("Confirm the publication and evidence declaration before publishing.");
-      return false;
-    }
-    return true;
-  }
-
-  async function publish() {
-    if (!validateCurrentStep()) return;
     if (isSupabase && !userId) {
       notify("Sign in before submitting an implementation record.");
-      navigate("/sign-in");
+      return;
+    }
+    if (recordFindings.some((finding) => finding.severity === "block")) {
+      notify("Remove credentials, tokens or internal endpoints from the public fields before submitting.");
       return;
     }
     setSaving(true);
     try {
-      const id = `implementation-${crypto.randomUUID()}`;
-      const slug = `${draft.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${id.slice(-6)}`;
-      const provenance = isSupabase ? "creator supplied" : "demo";
-      const record: ImplementationRecord = {
-        id,
-        slug,
-        name: draft.name.trim(),
-        summary: draft.summary.trim() || draft.problem.trim().slice(0, 220),
+      const submission = buildSubmission(draft, {
+        id: `implementation-${crypto.randomUUID()}`,
         ownerId: userId || "demo-user",
-        customerDisplayName:
-          draft.customerIdentityVisibility === "public"
-            ? "Contributor-provided customer identity"
-            : draft.customerIdentityVisibility === "anonymous"
-              ? "Customer identity withheld publicly"
-              : "Private to Oracnet",
-        customerIdentityVisibility: draft.customerIdentityVisibility,
-        industry: draft.industry,
-        businessType: draft.businessType,
-        organizationSizeBand: draft.organizationSizeBand,
-        employeeCountRange: draft.organizationSizeBand,
-        region: draft.region,
-        contextSummary: draft.contextSummary,
-        baselinePeriodStart: undefined,
-        baselinePeriodEnd: undefined,
-        measurementPeriodStart: undefined,
-        measurementPeriodEnd: undefined,
-        implementationStartDate: undefined,
-        goLiveDate: undefined,
-        implementationDuration: draft.implementationDuration || "Not disclosed",
-        implementationCost: draft.implementationCost,
-        implementationCostCurrency: "GBP",
-        costDisclosureType: draft.implementationCost == null ? "not-disclosed" : "exact",
-        ongoingMonthlyCost: draft.ongoingMonthlyCost,
-        ongoingCostDisclosureType: draft.ongoingMonthlyCost == null ? "not-disclosed" : "exact",
-        maintenanceHoursPerMonth: draft.maintenanceHours,
-        verificationState: isSupabase ? "creator-reported" : "demo",
-        publicationState: "published",
-        moderationState: isSupabase ? "pending" : "approved",
-        visibility: "public",
-        rightsState: draft.rightsState,
-        customerPermissionState: draft.permissionConfirmed ? "granted" : "pending",
-        implementerIds: [],
-        creatorIds: [],
-        providerIds: [
-          ...new Set(selectedProducts.map((product) => product.providerId)),
-        ],
-        derivedBlueprintIds: [],
-        lastEvidenceReviewAt: new Date().toISOString().slice(0, 10),
-        stalenessState: "unknown",
+        now: new Date(),
         demo: !isSupabase,
-        provenance,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      await actions.save("implementation_records", record);
-      await actions.save("implementation_contexts", {
-        id: `${id}-context`,
-        name: `${record.name} context`,
-        implementationId: id,
-        locations: draft.locations,
-        volumeLabel: draft.monthlyVolume == null ? "Not disclosed" : `${draft.monthlyVolume.toLocaleString()} per month`,
-        monthlyVolume: draft.monthlyVolume,
-        existingSystems: draft.existingSystems.split(",").map((value) => value.trim()).filter(Boolean),
-        technicalCapability: draft.technicalCapability,
-        regulatoryConstraints: [],
-        processMaturity: "Contributor supplied",
-        workflowCharacteristics: ["Contributor supplied"],
-        provenance,
+        definitions: data.definitions,
+        products: data.products,
       });
-      const phases = [
-        ["before", lines(draft.beforeProcess)],
-        ["change", lines(draft.processChange)],
-        ["after", lines(draft.afterProcess)],
-      ] as const;
-      for (const [phase, entries] of phases) {
-        for (const [position, description] of entries.entries()) {
-          await actions.save("implementation_process_steps", {
-            id: `${id}-${phase}-${position}`,
-            name: description,
-            implementationId: id,
-            phase,
-            position,
-            description,
-            humanRole: /human|staff|review|approval/i.test(description)
-              ? "Human decision/review recorded"
-              : "System or process step",
-            provenance,
-          });
-        }
+      // Order matters in connected mode: the record exists before the Blueprint that
+      // derives from it, and the Blueprint exists before the record links to it.
+      await actions.save("implementation_records", { ...submission.record, derivedBlueprintIds: [] });
+      await actions.save("implementation_contexts", submission.context);
+      await actions.save("implementation_use_cases", submission.useCase);
+      for (const row of submission.steps) await actions.save("implementation_process_steps", row);
+      for (const row of submission.stack) await actions.save("implementation_stack_items", row);
+      for (const row of submission.connections) await actions.save("implementation_connections", row);
+      for (const row of submission.periods) await actions.save("measurement_periods", row);
+      for (const row of submission.metrics) await actions.save("implementation_metrics", row);
+      for (const row of submission.claims) await actions.save("claims", row);
+      for (const row of submission.artifacts) await actions.save("evidence_artifacts", row);
+      for (const row of submission.links) await actions.save("claim_evidence", row);
+      if (submission.blueprint) {
+        await actions.save("blueprints", submission.blueprint.blueprint);
+        await actions.save("blueprint_versions", submission.blueprint.version);
+        for (const row of submission.blueprint.items) await actions.save("blueprint_stack_items", row);
+        for (const row of submission.blueprint.connections) await actions.save("blueprint_connections", row);
+        await actions.save("blueprint_licenses", submission.blueprint.license);
+        await actions.save("implementation_records", submission.record);
       }
-      const stackIds: string[] = [];
-      for (const [index, product] of selectedProducts.entries()) {
-        const stackId = `${id}-stack-${index}`;
-        stackIds.push(stackId);
-        await actions.save("implementation_stack_items", {
-          id: stackId,
-          name: product.name,
-          implementationId: id,
-          productId: product.id,
-          capabilityId: product.capabilityIds[0] ?? "unknown",
-          role: product.capabilityIds[0] ?? "Technology component",
-          evidenceLevel: isSupabase ? "creator-reported" : "demo",
-          notes: "Contributor selected this component. Compatibility must be verified separately.",
-          x: (index % 2) * 320,
-          y: Math.floor(index / 2) * 160,
-          provenance,
-        });
-      }
-      for (let index = 0; index < stackIds.length - 1; index += 1) {
-        await actions.save("implementation_connections", {
-          id: `${id}-connection-${index}`,
-          name: `Recorded handoff ${index + 1}`,
-          implementationId: id,
-          fromItemId: stackIds[index],
-          toItemId: stackIds[index + 1],
-          label: "Contributor-recorded handoff",
-          dataFlow: "Details require validation",
-          trustBoundary: false,
-          evidenceLevel: isSupabase ? "creator-reported" : "demo",
-          provenance,
-        });
-      }
-      const metricEntries = [
-        ["first-response-time", draft.baselineFirstResponse, draft.observedFirstResponse, "minutes"],
-        ["manual-handling-hours", draft.baselineManualHours, draft.observedManualHours, "hours"],
-      ] as const;
-      for (const [metricDefinitionId, baselineValue, observedValue, unit] of metricEntries) {
-        if (baselineValue == null && observedValue == null) continue;
-        const absoluteChange = baselineValue == null || observedValue == null ? null : observedValue - baselineValue;
-        const percentageChange = baselineValue == null || observedValue == null || baselineValue === 0
-          ? null
-          : ((observedValue - baselineValue) / baselineValue) * 100;
-        const metricId = `${id}-${metricDefinitionId}`;
-        await actions.save("implementation_metrics", {
-          id: metricId,
-          name: metricDefinitionId.replaceAll("-", " "),
-          implementationId: id,
-          metricDefinitionId,
-          baselineValue,
-          observedValue,
-          unit,
-          absoluteChange,
-          percentageChange,
-          evidenceLevel: isSupabase ? "creator-reported" : "demo",
-          sourceLabel: draft.evidenceDescription || "Contributor supplied; evidence not independently reviewed",
-          notes: draft.measurementNotes,
-          provenance,
-        });
-        await actions.save("claims", {
-          id: `${metricId}-claim`,
-          name: `${metricDefinitionId} observed value`,
-          subjectType: "metric",
-          subjectId: metricId,
-          predicate: "observed-value",
-          value: observedValue == null ? "Not recorded" : String(observedValue),
-          unit,
-          claimant: userId || "demo contributor",
-          status: "pending",
-          evidenceLevel: isSupabase ? "creator-reported" : "demo",
-          public: true,
-          provenance,
-        });
-      }
-      if (draft.evidenceDescription.trim()) {
-        const evidenceId = `${id}-evidence-1`;
-        await actions.save("evidence_artifacts", {
-          id: evidenceId,
-          name: "Contributor evidence metadata",
-          ownerId: userId || "demo-user",
-          kind: draft.evidenceKind,
-          publicMetadata: draft.evidenceDescription.trim(),
-          storagePath: "",
-          mimeType: "",
-          private: true,
-          provenance,
-        });
-      }
-      if (draft.attestationRequested) {
-        await actions.save("attestations", {
-          id: `${id}-attestation`,
-          name: "Customer attestation request",
-          implementationId: id,
-          ownerId: userId || "demo-user",
-          tokenHash: isSupabase ? "server-generated-required" : "demo-not-a-live-token",
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          status: "pending",
-          customerIdentityVisibility: draft.customerIdentityVisibility,
-          attestorLabel: "Customer representative",
-          provenance,
-        });
-      }
-      if (draft.blueprintRequested) {
-        const blueprintId = `blueprint-${crypto.randomUUID()}`;
-        const versionId = `${blueprintId}-v1`;
-        await actions.save("blueprints", {
-          id: blueprintId,
-          slug: `${draft.blueprintName || draft.name}-blueprint`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
-          name: draft.blueprintName.trim() || `${draft.name} reference blueprint`,
-          ownerId: userId || "demo-user",
-          description: "Sanitized Blueprint draft derived from the submitted implementation. Customer-specific details must be reviewed before production publication.",
-          derivedFromImplementationId: id,
-          useCaseIds: [],
-          capabilityIds: selectedProducts.flatMap((product) => product.capabilityIds),
-          currentVersionId: versionId,
-          estimatedComplexity: selectedProducts.length <= 3 ? "low" : selectedProducts.length <= 5 ? "medium" : "high",
-          requiredSkills: ["Business-rule mapping", "Integration validation"],
-          license: "Rights pending review",
-          reuseRights: draft.rightsState,
-          sourceAvailable: false,
-          commercialUseAllowed: draft.rightsState === "commercial-license" || draft.rightsState === "open-source",
-          maintainerId: userId || "demo-user",
-          lastValidatedAt: new Date().toISOString().slice(0, 10),
-          compatibilityState: "unknown",
-          knownLimitations: "Customer-specific fields, credentials, schemas, prompts and proprietary rules must remain excluded.",
-          publicationState: isSupabase ? "draft" : "published",
-          moderationState: isSupabase ? "pending" : "approved",
-          demo: !isSupabase,
-          provenance,
-        });
-        await actions.save("blueprint_versions", {
-          id: versionId,
-          name: "Version 1.0",
-          blueprintId,
-          version: "1.0",
-          changeNotes: "Initial sanitized draft generated from contributor-confirmed stack selections.",
-          lastValidatedAt: new Date().toISOString().slice(0, 10),
-          compatibilityState: "unknown",
-          completeness: 45,
-          provenance,
-        });
-        for (const [index, product] of selectedProducts.entries()) {
-          await actions.save("blueprint_stack_items", {
-            id: `${versionId}-item-${index}`,
-            name: product.name,
-            blueprintVersionId: versionId,
-            capabilityId: product.capabilityIds[0] ?? "unknown",
-            productId: product.id,
-            role: product.capabilityIds[0] ?? "Technology component",
-            required: true,
-            alternativeProductIds: [],
-            configurationRequirements: "Replace all customer-specific credentials, fields, business rules and private identifiers.",
-            x: (index % 2) * 320,
-            y: Math.floor(index / 2) * 160,
-            provenance,
-          });
-        }
-        record.derivedBlueprintIds = [blueprintId];
-        await actions.save("implementation_records", record);
+      if (isSupabase && submission.privateCustomerName) {
+        const { supabase } = await import("../data/supabase");
+        const { error: identityError } = await supabase
+          .from("implementation_customer_identities")
+          .upsert({ implementationId: submission.record.id, customerName: submission.privateCustomerName });
+        if (identityError) notify("Record saved, but the private customer name could not be stored. Add it from your workspace.");
       }
       localStorage.removeItem(draftKey);
-      notify(isSupabase ? "Implementation submitted for moderation." : "Demo implementation published locally.");
-      navigate(`/implementations/${record.slug}`);
+      setDone(submission);
+      notify("Implementation submitted for moderation.");
+    } catch {
+      // useActions surfaced the error; the draft stays saved.
     } finally {
       setSaving(false);
     }
   }
 
+  if (done)
+    return (
+      <div className="card wizard-done" role="status">
+        <Badge>{isSupabase ? "SUBMITTED" : "DEMO SUBMISSION"}</Badge>
+        <h1>Submitted for moderation.</h1>
+        <p>Your record is visible to you now and becomes public after review. Claims start as creator-reported; evidence levels change only through attestation or review.{done.blueprint ? " The derived Blueprint is a separate draft awaiting moderation." : ""}</p>
+        {!isSupabase && <p className="muted">Demo: saved in this browser only. {done.privateCustomerName ? "The private customer name you entered was not stored anywhere in demo mode." : ""}</p>}
+        <div className="row wrap">
+          <Link className="button dark" to={`/implementations/${done.record.slug}`}>View your record</Link>
+          {draft.inviteCustomer && <button type="button" className="button light" onClick={() => setInvite(true)}>Invite the customer to attest</button>}
+          <Link className="button light" to="/creator/implementations">Implementer workspace</Link>
+        </div>
+        {invite && <AttestationInviteDialog record={done.record} claims={done.claims} open onClose={() => setInvite(false)} />}
+      </div>
+    );
+
+  const productOptions = [...data.products].sort((a, b) => a.name.localeCompare(b.name));
   return (
     <>
       <PageHeading
-        eyebrow="CONTRIBUTE IMPLEMENTATION INTELLIGENCE"
+        eyebrow="CONTRIBUTE AN IMPLEMENTATION RECORD"
         title="Document what happened — without exposing customer secrets."
-        description="This workflow separates business context, observed metrics, evidence, rights and reusable Blueprint material. In demo mode everything stays in this browser."
+        description="Fifteen short steps separate public context from private verification data. Fields are marked PUBLIC or PRIVATE. Your draft saves automatically in this browser."
       />
       <div className="implementation-wizard-shell">
-        <aside className="implementation-wizard-steps" aria-label="Implementation submission steps">
+        <nav className="implementation-wizard-steps" aria-label="Submission steps">
           {steps.map((label, index) => (
-            <button
-              type="button"
-              key={label}
-              className={index === step ? "active" : index < step ? "complete" : ""}
-              onClick={() => index <= step && setStep(index)}
-            >
-              <span>{index < step ? <Check size={14} /> : index + 1}</span>
+            <button type="button" key={label} className={index === step ? "active" : index < step ? "complete" : ""} aria-current={index === step ? "step" : undefined} onClick={() => index <= step && setStep(index)} disabled={index > step}>
+              <span>{index < step ? <Check size={13} aria-hidden /> : index + 1}</span>
               {label}
             </button>
           ))}
-        </aside>
-        <section className="card implementation-wizard-panel">
+        </nav>
+        <section className="card implementation-wizard-panel" aria-labelledby="wizard-step-title">
           <div className="wizard-panel-head">
             <div>
               <span className="eyebrow">STEP {step + 1} OF {steps.length}</span>
-              <h2>{steps[step]}</h2>
+              <h2 id="wizard-step-title" tabIndex={-1}>{steps[step]}</h2>
             </div>
-            <span className="autosave-state"><Save size={14} /> Browser autosave</span>
+            <span className="autosave-state" role="status"><Save size={14} aria-hidden /> {savedAt ? `Draft saved ${savedAt}` : "Autosave on"}</span>
           </div>
 
           {step === 0 && (
             <div className="form-stack">
-              <label>Implementation record name<input value={draft.name} onChange={(event) => patch("name", event.target.value)} placeholder="Example: Multi-location enquiry automation" /></label>
-              <label>Short summary<textarea rows={3} value={draft.summary} onChange={(event) => patch("summary", event.target.value)} /></label>
-              <div className="grid two">
-                <label>Business type<input value={draft.businessType} onChange={(event) => patch("businessType", event.target.value)} /></label>
-                <label>Industry<input value={draft.industry} onChange={(event) => patch("industry", event.target.value)} /></label>
-                <label>Organization size<select value={draft.organizationSizeBand} onChange={(event) => patch("organizationSizeBand", event.target.value)}><option>1–10 employees</option><option>11–50 employees</option><option>51–200 employees</option><option>201+ employees</option></select></label>
-                <label>Region<input value={draft.region} onChange={(event) => patch("region", event.target.value)} /></label>
-                <label>Locations<input type="number" min="1" value={draft.locations ?? ""} onChange={(event) => patch("locations", event.target.value ? Number(event.target.value) : null)} /></label>
-                <label>Monthly volume<input type="number" min="0" value={draft.monthlyVolume ?? ""} onChange={(event) => patch("monthlyVolume", event.target.value ? Number(event.target.value) : null)} placeholder="Optional" /></label>
-              </div>
-              <label>Business context<textarea rows={5} value={draft.contextSummary} onChange={(event) => patch("contextSummary", event.target.value)} placeholder="Describe the business, workflow, volume and constraints needed to interpret the implementation." /></label>
-              <label>Existing systems<input value={draft.existingSystems} onChange={(event) => patch("existingSystems", event.target.value)} placeholder="Comma separated, e.g. CRM, shared inbox, phone" /></label>
-              <label>Technical capability<select value={draft.technicalCapability} onChange={(event) => patch("technicalCapability", event.target.value as Draft["technicalCapability"])}><option value="none">None</option><option value="basic">Basic</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
-            </div>
-          )}
-          {step === 1 && (
-            <div className="form-stack">
-              <label>What problem existed before implementation?<textarea rows={7} value={draft.problem} onChange={(event) => patch("problem", event.target.value)} /></label>
-              <label>Baseline median first-response time (minutes)<input type="number" min="0" value={draft.baselineFirstResponse ?? ""} onChange={(event) => patch("baselineFirstResponse", event.target.value ? Number(event.target.value) : null)} /></label>
-              <label>Baseline manual handling hours / week<input type="number" min="0" value={draft.baselineManualHours ?? ""} onChange={(event) => patch("baselineManualHours", event.target.value ? Number(event.target.value) : null)} /></label>
-            </div>
-          )}
-          {step === 2 && <ProcessEditor title="Existing process" help="One step per line. Record what actually happened before the implementation." value={draft.beforeProcess} onChange={(value) => patch("beforeProcess", value)} />}
-          {step === 3 && (
-            <div className="form-stack">
-              <ProcessEditor title="Process changes" help="One change per line. Separate operating redesign from product selection." value={draft.processChange} onChange={(value) => patch("processChange", value)} />
-              <ProcessEditor title="Process after implementation" help="One step per line. Include human review or exception paths explicitly." value={draft.afterProcess} onChange={(value) => patch("afterProcess", value)} />
-            </div>
-          )}
-          {step === 4 && (
-            <div className="wizard-explainer">
-              <Badge>STRUCTURED ARCHITECTURE</Badge>
-              <h3>Architecture follows the confirmed stack in V1.</h3>
-              <p>After selecting components, Oracnet creates an ordered recorded handoff. The public page treats that as a contributor-recorded architecture, not proof of official compatibility.</p>
-              <div className="notice"><ShieldCheck /><p>Production architecture editing should capture explicit data flows, trust boundaries and failure handling. No private credentials or internal URLs belong in the public record.</p></div>
-            </div>
-          )}
-          {step === 5 && (
-            <div className="form-stack">
-              <p>Select the technologies that were actually used. Selection records co-occurrence only; compatibility is verified separately.</p>
-              <div className="wizard-product-picker">
-                {products.map((product) => (
-                  <label key={product.id}>
-                    <input type="checkbox" checked={draft.stackProductIds.includes(product.id)} onChange={(event) => patch("stackProductIds", event.target.checked ? [...draft.stackProductIds, product.id] : draft.stackProductIds.filter((id) => id !== product.id))} />
-                    <span><strong>{product.name}</strong><small>{product.capabilityIds.join(", ")}</small></span>
+              <Field label="Customer or organization name" scope="private" help="Used only for verification. Never shown publicly unless you choose Public identity and have permission.">
+                <input value={draft.customerName} onChange={(event) => patch("customerName", event.target.value)} autoComplete="off" />
+              </Field>
+              <fieldset className="radio-group">
+                <legend>How should the customer appear publicly?</legend>
+                {([["public", "Public identity", "Name appears on the record (requires permission)."], ["anonymous", "Anonymous publicly", "Described by sector and size only."], ["private", "Private to Oracnet", "Only reviewers know who the customer is."]] as const).map(([value, label, help]) => (
+                  <label key={value} className="radio-card">
+                    <input type="radio" name="customer-visibility" checked={draft.customerVisibility === value} onChange={() => patch("customerVisibility", value)} />
+                    <span><strong>{label}</strong><small>{help}</small></span>
                   </label>
                 ))}
-              </div>
+              </fieldset>
+              <label className="checkbox-label"><input type="checkbox" checked={draft.customerPermission} onChange={(event) => patch("customerPermission", event.target.checked)} /> The customer has given permission to publish this record{draft.customerVisibility === "public" ? " with their name" : ""}.</label>
             </div>
           )}
-          {step === 6 && (
-            <div className="grid two">
-              <label>Implementation duration<input value={draft.implementationDuration} onChange={(event) => patch("implementationDuration", event.target.value)} placeholder="Example: 5 weeks" /></label>
-              <label>Implementation cost (GBP)<input type="number" min="0" value={draft.implementationCost ?? ""} onChange={(event) => patch("implementationCost", event.target.value ? Number(event.target.value) : null)} /></label>
-              <label>Ongoing monthly cost (GBP)<input type="number" min="0" value={draft.ongoingMonthlyCost ?? ""} onChange={(event) => patch("ongoingMonthlyCost", event.target.value ? Number(event.target.value) : null)} /></label>
-              <label>Maintenance hours / month<input type="number" min="0" value={draft.maintenanceHours ?? ""} onChange={(event) => patch("maintenanceHours", event.target.value ? Number(event.target.value) : null)} /></label>
-            </div>
-          )}
-          {step === 7 && (
+
+          {step === 1 && (
             <div className="form-stack">
+              <Field label="Record name" scope="public"><input value={draft.name} onChange={(event) => patch("name", event.target.value)} placeholder="e.g. Multi-location enquiry automation" /></Field>
+              <Field label="One-line summary" scope="public"><textarea rows={2} value={draft.summary} onChange={(event) => patch("summary", event.target.value)} /></Field>
               <div className="grid two">
-                <label>Observed first-response time (minutes)<input type="number" min="0" value={draft.observedFirstResponse ?? ""} onChange={(event) => patch("observedFirstResponse", event.target.value ? Number(event.target.value) : null)} /></label>
-                <label>Observed manual handling hours / week<input type="number" min="0" value={draft.observedManualHours ?? ""} onChange={(event) => patch("observedManualHours", event.target.value ? Number(event.target.value) : null)} /></label>
+                <Field label="Outcome / use case" scope="public">
+                  <select value={draft.useCaseId} onChange={(event) => patch("useCaseId", event.target.value)}>
+                    {data.useCases.filter((item) => ["enquiry-to-booking", "lead-qualification-routing", "after-hours-reservations"].includes(item.id)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Business type" scope="public"><input value={draft.businessType} onChange={(event) => patch("businessType", event.target.value)} placeholder="e.g. Property maintenance services" /></Field>
+                <Field label="Industry" scope="public"><input value={draft.industry} onChange={(event) => patch("industry", event.target.value)} /></Field>
+                <Field label="Organization size" scope="public"><select value={draft.organizationSizeBand} onChange={(event) => patch("organizationSizeBand", event.target.value)}>{sizeBands.map((band) => <option key={band}>{band}</option>)}</select></Field>
+                <Field label="Region" scope="public"><select value={draft.region} onChange={(event) => patch("region", event.target.value)}>{["United Kingdom", "Europe", "North America", "Global"].map((region) => <option key={region}>{region}</option>)}</select></Field>
+                <Field label="Locations" scope="public"><input type="number" min={1} value={draft.locations ?? ""} onChange={(event) => patch("locations", num(event.target.value))} /></Field>
+                <Field label="Monthly volume (from)" scope="public"><input type="number" min={0} value={draft.volumeMin ?? ""} onChange={(event) => patch("volumeMin", num(event.target.value))} placeholder="Optional" /></Field>
+                <Field label="Monthly volume (to)" scope="public"><input type="number" min={0} value={draft.volumeMax ?? ""} onChange={(event) => patch("volumeMax", num(event.target.value))} placeholder="Optional" /></Field>
+                <Field label="In-house technical capability" scope="public">
+                  <select value={draft.technicalCapability} onChange={(event) => patch("technicalCapability", event.target.value as ContributionDraft["technicalCapability"])}>
+                    <option value="none">None</option><option value="basic">Basic</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option>
+                  </select>
+                </Field>
+                <Field label="Existing systems (comma separated)" scope="public"><input value={draft.existingSystems} onChange={(event) => patch("existingSystems", event.target.value)} placeholder="e.g. HubSpot CRM, Phone" /></Field>
               </div>
-              <label>Measurement notes<textarea rows={6} value={draft.measurementNotes} onChange={(event) => patch("measurementNotes", event.target.value)} placeholder="Explain the measurement period, definition changes, exclusions and anything that limits comparison." /></label>
-              <div className="notice"><ShieldCheck /><p>Oracnet records “observed after implementation”. It does not turn before/after values into a causal claim.</p></div>
+              <Field label="Business context" scope="public" help="Describe the business so others can judge comparability. Do not include the customer’s name if identity is withheld."><textarea rows={4} value={draft.contextSummary} onChange={(event) => patch("contextSummary", event.target.value)} /></Field>
             </div>
           )}
+
+          {step === 2 && (
+            <div className="form-stack">
+              <Field label="What problem existed before?" scope="public"><textarea rows={5} value={draft.problem} onChange={(event) => patch("problem", event.target.value)} /></Field>
+              <fieldset className="metric-picker">
+                <legend>Metrics you measured (same definition before and after)</legend>
+                {templateMetrics.map((definition) => (
+                  <div key={definition.id} className="metric-picker-row">
+                    <label className="checkbox-label"><input type="checkbox" checked={draft.metricIds.includes(definition.id)} onChange={(event) => patch("metricIds", event.target.checked ? [...draft.metricIds, definition.id] : draft.metricIds.filter((id) => id !== definition.id))} /> {definition.name} <small className="muted">({definition.unit})</small></label>
+                    {draft.metricIds.includes(definition.id) && (
+                      <input type="number" aria-label={`Baseline ${definition.name}`} placeholder="Baseline" value={draft.baseline[definition.id] ?? ""} onChange={(event) => patch("baseline", { ...draft.baseline, [definition.id]: num(event.target.value) })} />
+                    )}
+                  </div>
+                ))}
+              </fieldset>
+              <div className="grid two">
+                <Field label="Baseline period start" scope="public"><input type="date" value={draft.baselineStart} onChange={(event) => patch("baselineStart", event.target.value)} /></Field>
+                <Field label="Baseline period end" scope="public"><input type="date" value={draft.baselineEnd} onChange={(event) => patch("baselineEnd", event.target.value)} /></Field>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && <Field label="Process before (one step per line)" scope="public" help="What actually happened, including manual steps."><textarea rows={8} value={draft.beforeProcess} onChange={(event) => patch("beforeProcess", event.target.value)} /></Field>}
+          {step === 4 && <Field label="What changed (one change per line)" scope="public" help="Operating changes, separate from technology choices."><textarea rows={8} value={draft.processChange} onChange={(event) => patch("processChange", event.target.value)} /></Field>}
+          {step === 5 && <Field label="Process after (one step per line)" scope="public" help="Include human review and exception paths explicitly."><textarea rows={8} value={draft.afterProcess} onChange={(event) => patch("afterProcess", event.target.value)} /></Field>}
+
+          {step === 6 && (
+            <div className="form-stack">
+              <p className="muted">Record components that were actually used. Listing them together records co-occurrence only; compatibility is verified separately.</p>
+              {draft.stack.map((item, index) => (
+                <div key={index} className="stack-editor-row">
+                  <span className="stack-index">{index + 1}</span>
+                  <select aria-label={`Component ${index + 1} product`} value={item.productId} onChange={(event) => { const product = data.products.find((entry) => entry.id === event.target.value); patch("stack", draft.stack.map((entry, position) => (position === index ? { ...entry, productId: event.target.value, capabilityId: product?.capabilityIds[0] ?? entry.capabilityId } : entry))); }}>
+                    {productOptions.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+                  </select>
+                  <select aria-label={`Component ${index + 1} capability`} value={item.capabilityId} onChange={(event) => patch("stack", draft.stack.map((entry, position) => (position === index ? { ...entry, capabilityId: event.target.value } : entry)))}>
+                    {Object.keys(capabilityLabels).map((id) => <option key={id} value={id}>{capabilityLabel(id)}</option>)}
+                  </select>
+                  <input aria-label={`Component ${index + 1} role`} placeholder="Role, e.g. Exception queue" value={item.role} onChange={(event) => patch("stack", draft.stack.map((entry, position) => (position === index ? { ...entry, role: event.target.value } : entry)))} />
+                  <button type="button" className="icon-button" aria-label={`Remove component ${index + 1}`} onClick={() => patch("stack", draft.stack.filter((_, position) => position !== index))}><Trash2 size={15} /></button>
+                </div>
+              ))}
+              <button type="button" className="button light" onClick={() => patch("stack", [...draft.stack, { productId: productOptions[0]?.id ?? "", capabilityId: productOptions[0]?.capabilityIds[0] ?? "automation", role: "" }])}><Plus size={15} aria-hidden /> Add component</button>
+              {draft.stack.length >= 2 && (
+                <fieldset className="connection-editor">
+                  <legend>Connections (data flows)</legend>
+                  {draft.connections.map((edge, index) => (
+                    <div key={index} className="stack-editor-row">
+                      <select aria-label={`Connection ${index + 1} from`} value={edge.from} onChange={(event) => patch("connections", draft.connections.map((entry, position) => (position === index ? { ...entry, from: Number(event.target.value) } : entry)))}>
+                        {draft.stack.map((item, position) => <option key={position} value={position}>{position + 1}. {data.products.find((product) => product.id === item.productId)?.name}</option>)}
+                      </select>
+                      <select aria-label={`Connection ${index + 1} to`} value={edge.to} onChange={(event) => patch("connections", draft.connections.map((entry, position) => (position === index ? { ...entry, to: Number(event.target.value) } : entry)))}>
+                        {draft.stack.map((item, position) => <option key={position} value={position}>{position + 1}. {data.products.find((product) => product.id === item.productId)?.name}</option>)}
+                      </select>
+                      <input aria-label={`Connection ${index + 1} label`} placeholder="Label" value={edge.label} onChange={(event) => patch("connections", draft.connections.map((entry, position) => (position === index ? { ...entry, label: event.target.value } : entry)))} />
+                      <input aria-label={`Connection ${index + 1} data`} placeholder="Data passed" value={edge.dataFlow} onChange={(event) => patch("connections", draft.connections.map((entry, position) => (position === index ? { ...entry, dataFlow: event.target.value } : entry)))} />
+                      <label className="checkbox-label small"><input type="checkbox" checked={edge.trustBoundary} onChange={(event) => patch("connections", draft.connections.map((entry, position) => (position === index ? { ...entry, trustBoundary: event.target.checked } : entry)))} /> Leaves the business</label>
+                      <button type="button" className="icon-button" aria-label={`Remove connection ${index + 1}`} onClick={() => patch("connections", draft.connections.filter((_, position) => position !== index))}><Trash2 size={15} /></button>
+                    </div>
+                  ))}
+                  <button type="button" className="button light" onClick={() => patch("connections", [...draft.connections, { from: 0, to: 1, label: "", dataFlow: "", trustBoundary: false }])}><Plus size={15} aria-hidden /> Add connection</button>
+                </fieldset>
+              )}
+            </div>
+          )}
+
+          {step === 7 && (
+            <div className="grid two">
+              <Field label="Implementation start" scope="public"><input type="date" value={draft.startDate} onChange={(event) => patch("startDate", event.target.value)} /></Field>
+              <Field label="Go-live" scope="public"><input type="date" value={draft.goLiveDate} onChange={(event) => patch("goLiveDate", event.target.value)} /></Field>
+              <Field label="Duration" scope="public"><input value={draft.duration} onChange={(event) => patch("duration", event.target.value)} placeholder="e.g. 5 weeks" /></Field>
+              <Field label="Setup cost disclosure" scope="public">
+                <select value={draft.costDisclosure} onChange={(event) => patch("costDisclosure", event.target.value as ContributionDraft["costDisclosure"])}>
+                  <option value="not-disclosed">Not disclosed</option><option value="exact">Exact</option><option value="range">Range</option>
+                </select>
+              </Field>
+              {draft.costDisclosure !== "not-disclosed" && <Field label={draft.costDisclosure === "range" ? "Cost from (GBP)" : "Cost (GBP)"} scope="public"><input type="number" min={0} value={draft.costLow ?? ""} onChange={(event) => patch("costLow", num(event.target.value))} /></Field>}
+              {draft.costDisclosure === "range" && <Field label="Cost to (GBP)" scope="public"><input type="number" min={0} value={draft.costHigh ?? ""} onChange={(event) => patch("costHigh", num(event.target.value))} /></Field>}
+              <Field label="Ongoing software cost / month (GBP)" scope="public"><input type="number" min={0} value={draft.monthlyCost ?? ""} onChange={(event) => patch("monthlyCost", num(event.target.value))} placeholder="Leave blank if not disclosed" /></Field>
+              <Field label="Maintenance hours / month" scope="public"><input type="number" min={0} value={draft.maintenanceHours ?? ""} onChange={(event) => patch("maintenanceHours", num(event.target.value))} /></Field>
+              <Field label="Maintenance burden" scope="public"><select value={draft.maintenanceBurden} onChange={(event) => patch("maintenanceBurden", event.target.value as ContributionDraft["maintenanceBurden"])}><option value="unknown">Not stated</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></Field>
+            </div>
+          )}
+
           {step === 8 && (
             <div className="form-stack">
-              <label>Evidence type<select value={draft.evidenceKind} onChange={(event) => patch("evidenceKind", event.target.value as Draft["evidenceKind"])}><option value="customer-attestation">Customer attestation</option><option value="analytics-export">Analytics export</option><option value="screenshot">Screenshot</option><option value="system-log">System log</option><option value="deployment-documentation">Deployment documentation</option><option value="public-case-study">Public case study</option><option value="other">Other</option></select></label>
-              <label>Evidence metadata / description<textarea rows={6} value={draft.evidenceDescription} onChange={(event) => patch("evidenceDescription", event.target.value)} placeholder="Describe what exists. Private evidence files are not uploaded in the static demo." /></label>
-              <div className="notice"><LockKeyhole /><p>Sensitive evidence is private by default. In production, files belong in a private Storage bucket with short-lived signed access and reviewer-only policies.</p></div>
+              <div className="notice"><ShieldAlert size={18} aria-hidden /><p>Record “observed after implementation”. Oracnet never presents before/after values as proof that the implementation caused the change.</p></div>
+              {draft.metricIds.map((id) => {
+                const definition = data.definitions.find((item) => item.id === id);
+                return (
+                  <Field key={id} label={`${definition?.name ?? id} — observed (${definition?.unit})`} scope="public" help={`Baseline: ${draft.baseline[id] ?? "not recorded"}`}>
+                    <input type="number" value={draft.observed[id] ?? ""} onChange={(event) => patch("observed", { ...draft.observed, [id]: num(event.target.value) })} />
+                  </Field>
+                );
+              })}
+              <div className="grid two">
+                <Field label="Observed period start" scope="public"><input type="date" value={draft.observedStart} onChange={(event) => patch("observedStart", event.target.value)} /></Field>
+                <Field label="Observed period end" scope="public"><input type="date" value={draft.observedEnd} onChange={(event) => patch("observedEnd", event.target.value)} /></Field>
+              </div>
+              <Field label="Measurement notes & limitations" scope="public"><textarea rows={4} value={draft.measurementNotes} onChange={(event) => patch("measurementNotes", event.target.value)} placeholder="Definition changes, seasonality, exclusions…" /></Field>
             </div>
           )}
+
           {step === 9 && (
             <div className="form-stack">
-              <label>Reuse / publication rights<select value={draft.rightsState} onChange={(event) => patch("rightsState", event.target.value as ReuseRights)}><option value="showcase-only">Showcase only</option><option value="reference-architecture">Reference architecture</option><option value="personal-use">Personal use</option><option value="commercial-license">Commercial license</option><option value="open-source">Open source</option><option value="custom-license">Custom license</option></select></label>
-              <label className="checkbox-label"><input type="checkbox" checked={draft.permissionConfirmed} onChange={(event) => patch("permissionConfirmed", event.target.checked)} /> I have permission to publish the non-confidential implementation information entered here.</label>
-              <div className="rights-checklist card">
-                <strong>Do not publish</strong>
-                <span>Credentials or API keys</span><span>Customer data</span><span>Private schemas</span><span>Confidential prompts</span><span>Internal API addresses</span><span>Proprietary decision logic without rights</span>
-              </div>
+              <p className="muted">Each material statement becomes a separate claim with its own evidence. New claims start as creator-reported and pending review.</p>
+              {claims.map((claim) => {
+                const option = draft.claimOptions[claim.key] ?? { include: true, method: "", limitations: "" };
+                const set = (value: Partial<typeof option>) => patch("claimOptions", { ...draft.claimOptions, [claim.key]: { ...option, ...value } });
+                return (
+                  <div key={claim.key} className="claim-editor card">
+                    <label className="checkbox-label"><input type="checkbox" checked={option.include} onChange={(event) => set({ include: event.target.checked })} /> <strong>{claim.name}</strong> <span className="muted">{claim.value}{claim.unit && claim.unit !== "GBP" ? ` ${claim.unit}` : ""}</span></label>
+                    {option.include && (
+                      <div className="grid two">
+                        <Field label="How do you know? (evidence method)" scope="public"><input value={option.method} onChange={(event) => set({ method: event.target.value })} placeholder="e.g. CRM export, phone system report" /></Field>
+                        <Field label="Known limitations" scope="public"><input value={option.limitations} onChange={(event) => set({ limitations: event.target.value })} /></Field>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {!claims.length && <p className="muted">No claims yet — add components, dates, cost or observed values in earlier steps.</p>}
             </div>
           )}
+
           {step === 10 && (
             <div className="form-stack">
-              <label>Customer identity visibility<select value={draft.customerIdentityVisibility} onChange={(event) => patch("customerIdentityVisibility", event.target.value as CustomerIdentityVisibility)}><option value="public">Public identity</option><option value="anonymous">Anonymous publicly</option><option value="private">Private to Oracnet</option></select></label>
-              <label className="checkbox-label"><input type="checkbox" checked={draft.attestationRequested} onChange={(event) => patch("attestationRequested", event.target.checked)} /> Prepare a customer attestation request</label>
-              <div className="notice"><ShieldCheck /><p>In connected production mode, attestation tokens must be server-generated, stored as hashes, expire, and grant access only to the claims included in that invitation.</p></div>
+              <div className="notice"><LockKeyhole size={18} aria-hidden /><p>Evidence files are private. {isSupabase ? "After submission, upload files from your workspace; they go to a private bucket and reviewers receive short-lived signed links." : "The static demo does not accept files — describe what exists instead."} Only the description below is shown publicly as metadata.</p></div>
+              {draft.evidence.map((item, index) => (
+                <div key={index} className="stack-editor-row">
+                  <select aria-label={`Evidence ${index + 1} type`} value={item.kind} onChange={(event) => patch("evidence", draft.evidence.map((entry, position) => (position === index ? { ...entry, kind: event.target.value as EvidenceArtifact["kind"] } : entry)))}>
+                    {["analytics-export", "system-log", "invoice", "screenshot", "deployment-documentation", "customer-attestation", "contract-excerpt", "public-case-study", "other"].map((kind) => <option key={kind} value={kind}>{kind.replaceAll("-", " ")}</option>)}
+                  </select>
+                  <input aria-label={`Evidence ${index + 1} description`} placeholder="What it shows (public metadata)" value={item.description} onChange={(event) => patch("evidence", draft.evidence.map((entry, position) => (position === index ? { ...entry, description: event.target.value } : entry)))} />
+                  <button type="button" className="icon-button" aria-label={`Remove evidence ${index + 1}`} onClick={() => patch("evidence", draft.evidence.filter((_, position) => position !== index))}><Trash2 size={15} /></button>
+                </div>
+              ))}
+              <button type="button" className="button light" onClick={() => patch("evidence", [...draft.evidence, { kind: "analytics-export", description: "" }])}><Plus size={15} aria-hidden /> Add evidence item</button>
             </div>
           )}
+
           {step === 11 && (
             <div className="form-stack">
-              <label className="checkbox-label"><input type="checkbox" checked={draft.blueprintRequested} onChange={(event) => patch("blueprintRequested", event.target.checked)} /> Create a separate sanitized Blueprint draft</label>
-              {draft.blueprintRequested && <label>Blueprint name<input value={draft.blueprintName} onChange={(event) => patch("blueprintName", event.target.value)} placeholder={`${draft.name || "Implementation"} reference blueprint`} /></label>}
-              <div className="wizard-explainer"><FileKey2 size={24} /><h3>The Blueprint is not the customer implementation.</h3><p>It gets a separate version, license, rights state and dependency manifest. Customer-specific data and proprietary logic remain excluded.</p></div>
+              <Field label="Rights for this record" scope="public" help="Controls what others may do with what you publish. It is separate from any Blueprint.">
+                <select value={draft.rightsState} onChange={(event) => patch("rightsState", event.target.value as ReuseRights)}>
+                  {Object.entries(rightsCatalogue).map(([id, info]) => <option key={id} value={id}>{info.label}</option>)}
+                </select>
+              </Field>
+              <p className="muted">{rightsCatalogue[draft.rightsState].description}</p>
+              {!!recordFindings.length && (
+                <div className="scan-findings" role="alert">
+                  <strong>The scanner flagged possible sensitive content in public fields:</strong>
+                  <ul>{recordFindings.map((finding, index) => <li key={index}>{finding.field}: {finding.kind.replaceAll("-", " ")} ({finding.excerpt}){finding.severity === "block" ? " — must be removed" : " — review"}</li>)}</ul>
+                </div>
+              )}
+              <label className="checkbox-label"><input type="checkbox" checked={draft.confidentialityConfirmed} onChange={(event) => patch("confidentialityConfirmed", event.target.checked)} /> Public fields contain no credentials, customer data, private prompts, internal endpoints or confidential business rules.</label>
             </div>
           )}
+
           {step === 12 && (
             <div className="form-stack">
-              <div className="wizard-review-grid">
-                <div><small>Record</small><strong>{draft.name || "Untitled"}</strong><span>{draft.businessType} · {draft.organizationSizeBand}</span></div>
-                <div><small>Technology components</small><strong>{selectedProducts.length}</strong><span>{selectedProducts.map((product) => product.name).join(", ") || "None selected"}</span></div>
-                <div><small>Evidence state</small><strong>{isSupabase ? "Creator reported → moderation" : "Demo / synthetic"}</strong><span>{draft.evidenceDescription || "No evidence metadata entered"}</span></div>
-                <div><small>Reuse</small><strong>{draft.rightsState.replaceAll("-", " ")}</strong><span>{draft.blueprintRequested ? "Separate Blueprint draft requested" : "No Blueprint requested"}</span></div>
+              <p>A customer attestation lets the customer confirm or reject individual claims. The link is single-use, expires, and shows only the claims you choose.</p>
+              <label className="checkbox-label"><input type="checkbox" checked={draft.inviteCustomer} onChange={(event) => patch("inviteCustomer", event.target.checked)} /> Invite the customer after submission</label>
+              <p className="muted">{isSupabase ? "The invitation is created and emailed by the server; the token is never stored in plain text." : "Demo: you will get a link to open yourself. No email is sent."}</p>
+            </div>
+          )}
+
+          {step === 13 && (
+            <div className="form-stack">
+              <label className="checkbox-label"><input type="checkbox" checked={draft.deriveBlueprint} onChange={(event) => patch("deriveBlueprint", event.target.checked)} /> Derive a separate, reusable Blueprint</label>
+              {draft.deriveBlueprint && (
+                <>
+                  <Field label="Blueprint name" scope="public"><input value={draft.blueprintName} onChange={(event) => patch("blueprintName", event.target.value)} /></Field>
+                  <Field label="Description (no customer details)" scope="public"><textarea rows={3} value={draft.blueprintDescription} onChange={(event) => patch("blueprintDescription", event.target.value)} /></Field>
+                  <Field label="Setup notes" scope="public"><textarea rows={3} value={draft.blueprintSetupNotes} onChange={(event) => patch("blueprintSetupNotes", event.target.value)} /></Field>
+                  <Field label="Blueprint reuse rights" scope="public">
+                    <select value={draft.blueprintRights} onChange={(event) => patch("blueprintRights", event.target.value as ReuseRights)}>
+                      {Object.entries(rightsCatalogue).map(([id, info]) => <option key={id} value={id}>{info.label}</option>)}
+                    </select>
+                  </Field>
+                  {!!blueprintFindings.length && (
+                    <div className="scan-findings" role="alert">
+                      <strong>Scanner findings in text that would become public:</strong>
+                      <ul>{blueprintFindings.map((finding, index) => <li key={index}>{finding.field}: {finding.kind.replaceAll("-", " ")} ({finding.excerpt}){finding.severity === "block" ? " — must be removed" : " — review"}</li>)}</ul>
+                    </div>
+                  )}
+                  <fieldset className="sanitization-checklist">
+                    <legend>Sanitization checklist — confirm each item</legend>
+                    {sanitizationChecklist.map((item) => (
+                      <label key={item.id} className="checkbox-label"><input type="checkbox" checked={draft.sanitizationConfirmed.includes(item.id)} onChange={(event) => patch("sanitizationConfirmed", event.target.checked ? [...draft.sanitizationConfirmed, item.id] : draft.sanitizationConfirmed.filter((id) => id !== item.id))} /> {item.label}</label>
+                    ))}
+                  </fieldset>
+                  <p className="muted small-print">Automated scanning assists you; it cannot guarantee that everything sensitive was removed, and it is not legal clearance. The Blueprint is published only after moderation.</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {step === 14 && (
+            <div className="form-stack">
+              <div className="review-columns">
+                <div className="card review-public">
+                  <Scope kind="public" />
+                  <h3>{draft.name || "Untitled record"}</h3>
+                  <p>{draft.summary || draft.problem.slice(0, 200)}</p>
+                  <dl className="detail-list">
+                    <div><dt>Customer shown as</dt><dd>{draft.customerVisibility === "public" && draft.customerPermission ? draft.customerName || "(name pending)" : draft.customerVisibility === "anonymous" ? "Withheld publicly" : "Private to Oracnet"}</dd></div>
+                    <div><dt>Business</dt><dd>{draft.businessType} · {draft.organizationSizeBand} · {draft.region}</dd></div>
+                    <div><dt>Components</dt><dd>{draft.stack.map((item) => data.products.find((product) => product.id === item.productId)?.name).join(", ") || "None"}</dd></div>
+                    <div><dt>Process steps</dt><dd>{lines(draft.beforeProcess).length} before · {lines(draft.processChange).length} changes · {lines(draft.afterProcess).length} after</dd></div>
+                    <div><dt>Claims</dt><dd>{claims.filter((claim) => draft.claimOptions[claim.key]?.include !== false).length} (creator-reported, pending review)</dd></div>
+                    <div><dt>Rights</dt><dd>{rightsCatalogue[draft.rightsState].label}</dd></div>
+                    <div><dt>Blueprint</dt><dd>{draft.deriveBlueprint ? `${draft.blueprintName} — separate draft, pending moderation` : "None"}</dd></div>
+                  </dl>
+                </div>
+                <div className="card review-private">
+                  <Scope kind="private" />
+                  <dl className="detail-list">
+                    <div><dt>Customer name</dt><dd>{draft.customerName || "Not provided"}</dd></div>
+                    <div><dt>Evidence items</dt><dd>{draft.evidence.length} (files private to reviewers)</dd></div>
+                    <div><dt>Attestation</dt><dd>{draft.inviteCustomer ? "Invite after submission" : "Not requested"}</dd></div>
+                  </dl>
+                  <p className="muted small-print">Nothing in this panel appears on the public record, in search, or in page metadata.</p>
+                </div>
               </div>
-              <label className="checkbox-label"><input type="checkbox" checked={draft.ownershipConfirmed} onChange={(event) => patch("ownershipConfirmed", event.target.checked)} /> I confirm the submission distinguishes observation from causality, contains no secrets, and accurately describes its current evidence state.</label>
-              <button className="button dark" disabled={saving} type="button" onClick={() => void publish().catch(() => {})}>{saving ? "Publishing…" : isSupabase ? "Submit for moderation" : "Publish demo record"} <ArrowRight size={17} /></button>
+              <label className="checkbox-label"><input type="checkbox" checked={draft.declaration} onChange={(event) => patch("declaration", event.target.checked)} /> I confirm this describes a real implementation accurately, distinguishes observation from causation, and contains no secrets.</label>
+              <button className="button dark" disabled={saving} type="button" onClick={() => void submit()}>{saving ? "Submitting…" : "Submit for moderation"} <ArrowRight size={17} aria-hidden /></button>
             </div>
           )}
 
           <div className="wizard-navigation">
-            <button className="button light" type="button" disabled={step === 0} onClick={() => setStep((current) => Math.max(0, current - 1))}><ArrowLeft size={16} /> Back</button>
-            {step < steps.length - 1 && <button className="button dark" type="button" onClick={() => validateCurrentStep() && setStep((current) => Math.min(steps.length - 1, current + 1))}>Continue <ArrowRight size={16} /></button>}
+            <button className="button light" type="button" disabled={step === 0} onClick={() => setStep((current) => Math.max(0, current - 1))}><ArrowLeft size={16} aria-hidden /> Back</button>
+            {step < steps.length - 1 && <button className="button dark" type="button" onClick={next}>Continue <ArrowRight size={16} aria-hidden /></button>}
           </div>
+          {error && step < steps.length - 1 && <p className="muted wizard-hint" aria-live="polite">{error}</p>}
         </section>
       </div>
-      <div className="wizard-privacy-foot"><LockKeyhole size={16} /> Do not enter confidential customer evidence in the browser-local demo.</div>
+      <div className="wizard-privacy-foot"><LockKeyhole size={16} aria-hidden /> {isSupabase ? "Submissions are reviewed before publication." : "Demo mode: everything stays in this browser. Do not enter real confidential information."}</div>
     </>
-  );
-}
-
-function ProcessEditor({
-  title,
-  help,
-  value,
-  onChange,
-}: {
-  title: string;
-  help: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label>
-      {title}
-      <textarea rows={8} value={value} onChange={(event) => onChange(event.target.value)} placeholder="One step per line" />
-      <small>{help}</small>
-    </label>
   );
 }

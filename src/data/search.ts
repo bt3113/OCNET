@@ -8,9 +8,16 @@ import type {
 } from "./model";
 import type {
   Blueprint,
+  BlueprintStackItem,
+  Claim,
   ImplementationContext,
   ImplementationRecord,
+  ImplementationStackItem,
+  ImplementationUseCase,
 } from "./intelligence-model";
+import { capabilityLabel } from "./taxonomy";
+import { evidenceLevelInfo } from "./evidence";
+import { rightsCatalogue } from "./rights";
 import { isPublicBuild, completeness } from "./build-domain";
 export type SearchType =
   | "Implementation"
@@ -33,11 +40,17 @@ export interface SearchDocument {
   updatedAt?: string;
   completeness: number;
   provenance: string;
+  /** Last evidence review / validation date (ISO) where applicable. */
+  reviewedAt?: string;
 }
 export interface SearchCatalogue {
   implementations?: ImplementationRecord[];
   implementationContexts?: ImplementationContext[];
+  implementationStackItems?: ImplementationStackItem[];
+  implementationUseCases?: ImplementationUseCase[];
+  claims?: Claim[];
   blueprints?: Blueprint[];
+  blueprintItems?: BlueprintStackItem[];
   builds: Build[];
   products: Product[];
   creators: CreatorProfile[];
@@ -81,13 +94,22 @@ export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
             implementation.organizationSizeBand,
             implementation.region,
             implementation.contextSummary,
-            implementation.verificationState,
+            implementation.problemStatement,
+            evidenceLevelInfo[implementation.verificationState].label,
             context?.existingSystems.join(" "),
             context?.workflowCharacteristics.join(" "),
+            ...(c.implementationStackItems ?? [])
+              .filter((item) => item.implementationId === implementation.id)
+              .flatMap((item) => [c.products.find((product) => product.id === item.productId)?.name ?? "", capabilityLabel(item.capabilityId)]),
+            ...(c.implementationUseCases ?? [])
+              .filter((link) => link.implementationId === implementation.id)
+              .map((link) => c.cases.find((useCase) => useCase.id === link.useCaseId)?.name ?? ""),
+            ...[...new Set((c.claims ?? []).filter((claim) => claim.public && (claim.subjectId === implementation.id || claim.subjectId.startsWith(`${implementation.id}-`))).map((claim) => evidenceLevelInfo[claim.evidenceLevel].label))],
           ].join(" "),
           type: "Implementation" as const,
           path: "/implementations/" + implementation.slug,
           updatedAt: implementation.updatedAt,
+          reviewedAt: implementation.lastEvidenceReviewAt,
           completeness: Math.min(100, completenessScore * 16),
           provenance: implementation.provenance,
         };
@@ -103,9 +125,13 @@ export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
         name: blueprint.name,
         description: blueprint.description,
         text: [
-          ...blueprint.capabilityIds,
+          ...blueprint.capabilityIds.map(capabilityLabel),
+          ...(blueprint.capabilityIds.includes("human-escalation") ? ["human approval review exception"] : []),
+          ...(c.blueprintItems ?? [])
+            .filter((item) => item.blueprintVersionId === blueprint.currentVersionId)
+            .flatMap((item) => [item.productId, ...item.alternativeProductIds].map((id) => c.products.find((product) => product.id === id)?.name ?? "")),
           ...blueprint.requiredSkills,
-          blueprint.reuseRights,
+          rightsCatalogue[blueprint.reuseRights].label,
           blueprint.estimatedComplexity,
           blueprint.knownLimitations,
           blueprint.compatibilityState,
@@ -113,6 +139,7 @@ export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
         type: "Blueprint" as const,
         path: "/blueprints/" + blueprint.slug,
         updatedAt: blueprint.updatedAt,
+        reviewedAt: blueprint.lastValidatedAt,
         completeness: 75,
         provenance: blueprint.provenance,
       })),
@@ -225,61 +252,93 @@ export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
     })),
   ];
 }
-const stop = new Set([
-  "a",
-  "an",
-  "the",
-  "to",
-  "for",
-  "using",
-  "with",
-  "and",
-  "i",
-  "want",
-  "can",
-  "who",
-  "people",
-  "me",
-  "show",
-  "projects",
-  "build",
-  "builds",
-]);
-export function searchIndex(
-  docs: SearchDocument[],
-  query: string,
-  type?: string,
-) {
-  const terms =
-    query
-      .toLowerCase()
-      .match(/[a-z0-9]+/g)
-      ?.filter((term) => !stop.has(term)) ?? [];
+const stop = new Set(["a", "an", "the", "to", "for", "using", "use", "uses", "with", "and", "i", "want", "can", "who", "people", "me", "show", "of", "in", "that", "my", "our", "we", "this", "year"]);
+
+/** Tiny deterministic stemmer: good enough to align "automate"/"automation", "calls"/"call". */
+export function stem(word: string) {
+  let value = word.toLowerCase();
+  for (const suffix of ["ions", "ion", "ing", "ies", "es", "ed", "s", "e"]) {
+    if (value.length - suffix.length >= 4 && value.endsWith(suffix)) {
+      value = value.slice(0, -suffix.length) + (suffix === "ies" ? "y" : "");
+      break;
+    }
+  }
+  return value;
+}
+
+const synonyms: Record<string, string[]> = {
+  restaurant: ["hospitality", "reservation"],
+  restaurants: ["hospitality", "reservation"],
+  hotel: ["hospitality"],
+  salon: ["beauty"],
+  plumber: ["plumbing", "trades"],
+  crm: ["hubspot", "pipedrive"],
+  enquiry: ["inquiry", "lead"],
+  inquiry: ["enquiry"],
+  booking: ["reservation", "appointment"],
+  "customer-attested": ["customer attested"],
+};
+
+const typeWords: Record<string, SearchType> = {
+  implementation: "Implementation",
+  implementations: "Implementation",
+  blueprint: "Blueprint",
+  blueprints: "Blueprint",
+  technology: "Technology",
+  technologies: "Technology",
+  implementer: "Implementer",
+  implementers: "Implementer",
+};
+
+const tokenize = (text: string) => (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).map(stem);
+
+export function parseQuery(query: string, now = new Date()) {
+  let rest = query.toLowerCase();
+  let reviewedYear: number | undefined;
+  const reviewed = rest.match(/reviewed (this year|in (\d{4}))/);
+  if (reviewed) {
+    reviewedYear = reviewed[2] ? Number(reviewed[2]) : now.getFullYear();
+    rest = rest.replace(reviewed[0], " ");
+  }
+  let impliedType: SearchType | undefined;
+  const words = (rest.match(/[a-z0-9-]+/g) ?? []).filter((word) => {
+    if (typeWords[word] && !impliedType) {
+      impliedType = typeWords[word];
+      return false;
+    }
+    return !stop.has(word);
+  });
+  const groups = words.map((word) => [...new Set([word, ...(synonyms[word] ?? [])].flatMap((term) => tokenize(term)))]);
+  /** Evidence qualifiers narrow results; they are never optional terms. */
+  const required = words.filter((word) => /attest|audit|verified/.test(word)).map((word) => tokenize(word).filter((token) => !["customer", "independ"].includes(token)));
+  return { groups: groups.filter((group) => group.length), required: required.filter((group) => group.length), reviewedYear, impliedType };
+}
+
+/**
+ * Deterministic local search (demo mode). A document matches when at least 60%
+ * of the query's term groups match (a group is a word plus its synonyms).
+ * Ranking is organic: name matches, term coverage, then recency. No paid boost.
+ */
+export function searchIndex(docs: SearchDocument[], query: string, type?: string, now = new Date()) {
+  const { groups, required, reviewedYear, impliedType } = parseQuery(query, now);
+  const effectiveType = type ?? impliedType;
+  const needed = Math.ceil(groups.length * 0.6);
   return docs
-    .filter((document) => !type || document.type === type)
+    .filter((document) => !effectiveType || document.type === effectiveType)
+    .filter((document) => !reviewedYear || (document.reviewedAt ?? "").startsWith(String(reviewedYear)))
     .map((document) => {
-      const name = document.name.toLowerCase();
-      const text = [document.name, document.description, document.text]
-        .join(" ")
-        .toLowerCase();
-      const matches = terms.filter((term) => text.includes(term)).length;
-      const exact = name === query.toLowerCase() ? 100 : 0;
-      const score =
-        exact +
-        terms.reduce(
-          (total, term) =>
-            total + (name.includes(term) ? 12 : text.includes(term) ? 5 : 0),
-          0,
-        ) +
-        (document.type === "Implementation" ? 2 : 0) +
-        document.completeness / 100;
-      return { ...document, score, matches };
+      const nameTokens = new Set(tokenize(document.name));
+      const allTokens = new Set(tokenize([document.name, document.description, document.text].join(" ")));
+      const matched = groups.filter((group) => group.some((term) => allTokens.has(term)));
+      const nameHits = groups.filter((group) => group.some((term) => nameTokens.has(term))).length;
+      const exact = document.name.toLowerCase() === query.toLowerCase().trim() ? 100 : 0;
+      const score = exact + nameHits * 12 + matched.length * 6 + document.completeness / 100;
+      return { ...document, score, matches: matched.length };
     })
-    .filter((document) => !terms.length || document.matches === terms.length)
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "") ||
-        a.name.localeCompare(b.name),
-    );
+    .filter((document) => !groups.length || document.matches >= needed)
+    .filter((document) => {
+      const tokens = new Set(tokenize([document.name, document.description, document.text].join(" ")));
+      return required.every((group) => group.every((term) => tokens.has(term)));
+    })
+    .sort((a, b) => b.score - a.score || (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "") || a.name.localeCompare(b.name));
 }

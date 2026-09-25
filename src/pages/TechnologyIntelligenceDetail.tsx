@@ -19,7 +19,13 @@ import {
   BlueprintCard,
   EvidenceBadge,
   ImplementationCard,
+  RelationshipTypeBadge,
+  SectionIntro,
+  StalenessBadge,
 } from "../components/intelligence";
+import { isPublicRecord } from "../data/intelligence-hooks";
+import { relationshipFreshness } from "../data/staleness";
+import { isPublicBuild } from "../data/build-domain";
 import { ProductMediaList } from "../components/media";
 import { useActions, useRecords, useUI } from "../state";
 
@@ -41,6 +47,9 @@ export default function TechnologyIntelligenceDetail() {
   const { data: blueprintItems = [] } = useRecords("blueprint_stack_items");
   const { data: relationships = [] } = useRecords("technology_relationships");
   const { data: checks = [] } = useRecords("compatibility_checks");
+  const { data: useCaseLinks = [] } = useRecords("implementation_use_cases");
+  const { data: useCases = [] } = useRecords("use_cases");
+  const { data: builds = [] } = useRecords("builds");
   if (isLoading) return <Skeleton />;
   const product = products.find((item) => item.slug === slug);
   if (!product)
@@ -52,6 +61,7 @@ export default function TechnologyIntelligenceDetail() {
       />
     );
   const provider = providers.find((item) => item.id === product.providerId);
+  const now = new Date();
   const relatedImplementationIds = stackItems
     .filter((item) => item.productId === product.id)
     .map((item) => item.implementationId);
@@ -70,18 +80,22 @@ export default function TechnologyIntelligenceDetail() {
       relationship.sourceProductId === product.id ||
       relationship.targetProductId === product.id,
   );
-  const coProducts = [
-    ...new Set(
-      productRelationships.map((relationship) =>
-        relationship.sourceProductId === product.id
-          ? relationship.targetProductId
-          : relationship.sourceProductId,
-      ),
+  const publicImplementations = relatedImplementations.filter(isPublicRecord);
+  const recordStacks = publicImplementations.map((record) => new Set(stackItems.filter((item) => item.implementationId === record.id).map((item) => item.productId)));
+  const coCounts = new Map<string, number>();
+  for (const stack of recordStacks) for (const id of stack) if (id !== product.id) coCounts.set(id, (coCounts.get(id) ?? 0) + 1);
+  const coOccurring = [...coCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const useCaseCountMap = new Map<string, number>();
+  for (const link of useCaseLinks.filter((item) => publicImplementations.some((record) => record.id === item.implementationId)))
+    useCaseCountMap.set(link.useCaseId, (useCaseCountMap.get(link.useCaseId) ?? 0) + 1);
+  const useCaseCounts = [...useCaseCountMap.entries()].sort((a, b) => b[1] - a[1]);
+  const alternativeIds = new Set(
+    blueprintItems.flatMap((item) =>
+      item.productId === product.id ? item.alternativeProductIds : item.alternativeProductIds.includes(product.id) && item.productId ? [item.productId, ...item.alternativeProductIds.filter((id) => id !== product.id)] : [],
     ),
-  ]
-    .map((id) => products.find((candidate) => candidate.id === id))
-    .filter((item): item is NonNullable<typeof item> => !!item);
-
+  );
+  const alternatives = products.filter((candidate) => alternativeIds.has(candidate.id));
+  const relatedBuilds = builds.filter((build) => isPublicBuild(build) && build.stack.some((item) => item.productId === product.id));
   return (
     <>
       <Breadcrumbs
@@ -111,7 +125,7 @@ export default function TechnologyIntelligenceDetail() {
           <ShieldCheck size={22} />
           <strong>Implementation context</strong>
           <p>
-            {relatedImplementations.length} synthetic Oracnet record{relatedImplementations.length === 1 ? "" : "s"} currently reference this product.
+            {publicImplementations.length} published record{publicImplementations.length === 1 ? "" : "s"} and {relatedBlueprints.length} Blueprint{relatedBlueprints.length === 1 ? "" : "s"} reference this product. {productRelationships.length} typed relationship{productRelationships.length === 1 ? "" : "s"} recorded.
           </p>
           <small>Demo counts are derived from records; they are not market-share claims.</small>
         </div>
@@ -225,13 +239,11 @@ export default function TechnologyIntelligenceDetail() {
       ) : (
         <>
           <section className="intelligence-section">
-            <div className="section-title-text">
-              <span className="eyebrow">USED IN IMPLEMENTATIONS</span>
-              <h2>See the product inside an operating context</h2>
-              <p>Use an implementation record to understand role and surrounding components before evaluating the product in isolation.</p>
-            </div>
+            <SectionIntro eyebrow="USED IN IMPLEMENTATION RECORDS" title="See the product inside an operating context">
+              {publicImplementations.length} published record{publicImplementations.length === 1 ? "" : "s"} reference this product{publicImplementations.every((item) => item.demo) && publicImplementations.length ? " (all illustrative)" : ""}. Counts come from records only — they are not market share.
+            </SectionIntro>
             <div className="implementation-grid">
-              {relatedImplementations.map((implementation) => (
+              {publicImplementations.map((implementation) => (
                 <ImplementationCard
                   key={implementation.id}
                   implementation={implementation}
@@ -241,78 +253,103 @@ export default function TechnologyIntelligenceDetail() {
                 />
               ))}
             </div>
-            {!relatedImplementations.length && (
-              <div className="card empty-inline">No approved implementation record references this technology yet.</div>
-            )}
+            {!publicImplementations.length && <div className="card empty-inline">No published implementation record references this technology yet.</div>}
           </section>
 
+          {!!useCaseCounts.length && (
+            <section className="intelligence-section">
+              <SectionIntro eyebrow="OUTCOMES IN RECORDS" title="Use cases where it was recorded" />
+              <div className="tags">
+                {useCaseCounts.map(([useCaseId, count]) => {
+                  const useCase = useCases.find((item) => item.id === useCaseId);
+                  return <Link key={useCaseId} className="tag-link" to={`/use-cases/${useCase?.slug ?? useCaseId}`}>{useCase?.name ?? useCaseId} · {count} record{count === 1 ? "" : "s"}</Link>;
+                })}
+              </div>
+            </section>
+          )}
+
           <section className="intelligence-section">
-            <div className="section-title-text">
-              <span className="eyebrow">RECORDED RELATIONSHIPS</span>
-              <h2>Compatibility is a claim with provenance</h2>
-              <p>Appearing together does not automatically mean native or officially supported integration.</p>
-            </div>
+            <SectionIntro eyebrow="TYPED RELATIONSHIPS" title="Compatibility is a claim with provenance">
+              “Observed together” means two products appeared in the same record. It is not verified compatibility.
+            </SectionIntro>
             <div className="relationship-grid">
               {productRelationships.map((relationship) => {
-                const otherId = relationship.sourceProductId === product.id
-                  ? relationship.targetProductId
-                  : relationship.sourceProductId;
+                const otherId = relationship.sourceProductId === product.id ? relationship.targetProductId : relationship.sourceProductId;
                 const other = products.find((candidate) => candidate.id === otherId);
-                const check = checks.find((candidate) => candidate.relationshipId === relationship.id);
+                const history = checks.filter((candidate) => candidate.relationshipId === relationship.id).sort((a, b) => b.checkedAt.localeCompare(a.checkedAt));
                 return (
                   <div className="card technology-relationship-card" key={relationship.id}>
-                    <GitMerge size={20} />
-                    <div>
-                      <strong>{other?.name ?? otherId}</strong>
-                      <span>{relationship.relationshipType.replaceAll("-", " ")}</span>
-                      <p>{relationship.sourceLabel}</p>
-                      <div className="row wrap">
-                        <EvidenceBadge level={relationship.evidenceLevel} compact />
-                        <Badge>{check?.result ?? "unknown"}</Badge>
-                      </div>
+                    <strong>{other ? <Link to={`/technologies/${other.slug}`}>{other.name}</Link> : otherId}</strong>
+                    <div className="row wrap">
+                      <RelationshipTypeBadge type={relationship.relationshipType} />
+                      <EvidenceBadge level={relationship.evidenceLevel} compact />
+                      <StalenessBadge state={relationshipFreshness(relationship, now).state} />
                     </div>
+                    <small>Source: {relationship.sourceLabel}</small>
+                    {!!relationship.conditions?.length && <small>Conditions: {relationship.conditions.join(" ")}</small>}
+                    <small>Last checked {relationship.lastCheckedAt}{history[0] ? ` · latest check ${history[0].result}` : ""}{history.length > 1 ? ` · ${history.length} checks recorded` : ""}</small>
                   </div>
                 );
               })}
             </div>
-            {!productRelationships.length && (
-              <div className="card empty-inline">No evidence-backed compatibility relationship has been recorded.</div>
-            )}
+            {!productRelationships.length && <div className="card empty-inline">No typed relationship has been recorded for this product.</div>}
           </section>
+
+          {!!coOccurring.length && (
+            <section className="intelligence-section">
+              <SectionIntro eyebrow="CO-OCCURRING IN RECORDS" title="Components recorded alongside it">Co-occurrence counts published records containing both products. It says nothing about compatibility.</SectionIntro>
+              <div className="stack-table card">
+                {coOccurring.map(([id, count]) => {
+                  const other = products.find((item) => item.id === id);
+                  return (
+                    <div key={id} className="stack-row">
+                      {other ? <Logo initials={other.initials} color={other.color} /> : <span className="logo-tile sand">?</span>}
+                      <span>{other ? <Link to={`/technologies/${other.slug}`}>{other.name}</Link> : id}</span>
+                      <span className="muted">{count} record{count === 1 ? "" : "s"}</span>
+                      <span />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {!!alternatives.length && (
+            <section className="intelligence-section">
+              <SectionIntro eyebrow="ALTERNATIVES" title="Recorded as swappable in Blueprints">Only alternatives a Blueprint maintainer recorded for the same capability slot. Swapping still requires a compatibility check.</SectionIntro>
+              <div className="grid three">{alternatives.map((candidate) => <TechnologyCard key={candidate.id} product={candidate} />)}</div>
+            </section>
+          )}
 
           {!!relatedBlueprints.length && (
             <section className="intelligence-section">
-              <div className="section-title-text">
-                <span className="eyebrow">BLUEPRINTS</span>
-                <h2>Reference architectures using {product.name}</h2>
-              </div>
+              <SectionIntro eyebrow="BLUEPRINTS" title={`Reference architectures using ${product.name}`} />
               <div className="grid three">
                 {relatedBlueprints.map((blueprint) => (
-                  <BlueprintCard
-                    key={blueprint.id}
-                    blueprint={blueprint}
-                    version={versions.find((version) => version.id === blueprint.currentVersionId)}
-                    stackItems={blueprintItems.filter((item) => item.blueprintVersionId === blueprint.currentVersionId)}
-                    products={products}
-                  />
+                  <BlueprintCard key={blueprint.id} blueprint={blueprint} version={versions.find((version) => version.id === blueprint.currentVersionId)} stackItems={blueprintItems.filter((item) => item.blueprintVersionId === blueprint.currentVersionId)} products={products} />
                 ))}
               </div>
             </section>
           )}
 
-          {!!coProducts.length && (
+          {!!relatedBuilds.length && (
             <section className="intelligence-section">
-              <div className="section-title-text">
-                <span className="eyebrow">CO-OCCURRING COMPONENTS</span>
-                <h2>Products connected in recorded relationships</h2>
-              </div>
-              <div className="grid three">
-                {coProducts.slice(0, 6).map((candidate) => (
-                  <TechnologyCard key={candidate.id} product={candidate} />
-                ))}
-              </div>
+              <SectionIntro eyebrow="BUILDS" title="Creator projects using it">Builds are creator showcases, not deployment evidence.</SectionIntro>
+              <ul className="build-links">{relatedBuilds.map((build) => <li key={build.id}><Link to={`/builds/${build.slug}`}>{build.name}</Link> <span className="muted">— {build.tagline}</span></li>)}</ul>
             </section>
           )}
+
+          <section className="intelligence-section">
+            <div className="card provider-actions">
+              <strong>Are you the provider?</strong>
+              <p>Providers can claim this profile, submit corrections and relationship evidence. They cannot remove independent implementation records; disputes go to moderation.</p>
+              <div className="row wrap">
+                <Link className="button light" to="/provider/compatibility">Submit relationship evidence</Link>
+                <Link className="button light" to="/provider/implementations">Submit a correction</Link>
+                <Link className="button light" to="/provider/claims">Claim this profile</Link>
+              </div>
+            </div>
+          </section>
         </>
       )}
 

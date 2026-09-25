@@ -41,6 +41,7 @@ const ImplementationWizard = lazy(
   () => import("./pages/ImplementationWizard"),
 );
 const Blueprints = lazy(() => import("./pages/Blueprints"));
+const SearchPage = lazy(() => import("./pages/Search"));
 const SolutionCompiler = lazy(() => import("./pages/SolutionCompiler"));
 const UseCaseIntelligenceDetail = lazy(
   () => import("./pages/UseCaseIntelligenceDetail"),
@@ -72,6 +73,7 @@ const intelligenceWorkspaceRoutes = new Set([
   "/admin/blueprints",
   "/admin/compatibility",
   "/admin/staleness",
+  "/admin/audit",
 ]);
 
 function SEO() {
@@ -234,7 +236,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="implementation/new" element={<ImplementationWizard />} />
                     <Route path="verify/:token" element={<Verification />} />
                     <Route path="implementers" element={<Implementers />} />
-                    {["builds", "explore", "search"].map((p) => (
+                    <Route path="implementers/:slug" element={<Implementers />} />
+                    <Route path="search" element={<SearchPage />} />
+                    {["builds", "explore"].map((p) => (
                       <Route key={p} path={p} element={<BuildDiscovery />} />
                     ))}
                     <Route path="builds/:slug" element={<BuildDetail />} />

@@ -16,6 +16,9 @@ import {
   ImplementationCard,
 } from "../components/intelligence";
 import { useRecords } from "../state";
+import { isPublicRecord } from "../data/intelligence-hooks";
+import { templateForUseCase } from "../data/category-templates";
+import { capabilityLabel } from "../data/taxonomy";
 
 export default function UseCaseIntelligenceDetail() {
   const { slug } = useParams();
@@ -30,6 +33,7 @@ export default function UseCaseIntelligenceDetail() {
   const { data: blueprints = [] } = useRecords("blueprints");
   const { data: versions = [] } = useRecords("blueprint_versions");
   const { data: blueprintItems = [] } = useRecords("blueprint_stack_items");
+  const { data: integrators = [] } = useRecords("integrators");
   if (isLoading) return <Skeleton />;
   const useCase = cases.find((item) => item.slug === slug);
   if (!useCase)
@@ -44,12 +48,13 @@ export default function UseCaseIntelligenceDetail() {
     .filter((relation) => relation.useCaseId === useCase.id)
     .map((relation) => relation.implementationId);
   const relatedImplementations = implementations.filter(
-    (implementation) =>
-      implementationIds.includes(implementation.id) &&
-      implementation.publicationState === "published",
+    (implementation) => implementationIds.includes(implementation.id) && isPublicRecord(implementation),
   );
-  const relatedBlueprints = blueprints.filter((blueprint) =>
-    blueprint.useCaseIds.includes(useCase.id),
+  const template = templateForUseCase(useCase.id);
+  const nonDemo = relatedImplementations.filter((implementation) => !implementation.demo);
+  const implementers = integrators.filter((partner) => relatedImplementations.some((record) => record.implementerIds.includes(partner.id)));
+  const relatedBlueprints = blueprints.filter(
+    (blueprint) => blueprint.useCaseIds.includes(useCase.id) && blueprint.publicationState === "published" && blueprint.moderationState === "approved",
   );
   const pattern = stacks.find((stack) => stack.id === useCase.stackId);
   const productIds = new Set([
@@ -84,8 +89,13 @@ export default function UseCaseIntelligenceDetail() {
         <div className="section-title-text">
           <span className="eyebrow">COMPARABLE IMPLEMENTATIONS</span>
           <h2>How this outcome has been represented in Oracnet.</h2>
-          <p>Current records are synthetic demonstrations until real customer evidence is onboarded.</p>
+          <p>{relatedImplementations.length} published record{relatedImplementations.length === 1 ? "" : "s"}. Different businesses chose different architectures for the same outcome.</p>
         </div>
+        {relatedImplementations.length >= 2 && (
+          <Link className="button light compare-link" to={`/compare/implementations?ids=${encodeURIComponent(relatedImplementations.slice(0, 3).map((item) => item.id).join(","))}`}>
+            Compare these approaches <ArrowRight size={15} />
+          </Link>
+        )}
         <div className="implementation-grid">
           {relatedImplementations.map((implementation) => (
             <ImplementationCard
@@ -101,6 +111,36 @@ export default function UseCaseIntelligenceDetail() {
           <div className="card empty-inline">No approved implementation records have been attached to this use case yet.</div>
         )}
       </section>
+
+      <section className="intelligence-section">
+        <div className="section-title-text">
+          <span className="eyebrow">PATTERNS ACROSS RECORDS</span>
+          <h2>Context and metric patterns</h2>
+        </div>
+        <div className="card empty-inline">
+          {nonDemo.length >= 5
+            ? `${nonDemo.length} non-demo records are available; pattern summaries will be shown with their sample size.`
+            : `Not shown: there are ${nonDemo.length} non-demo records for this outcome. Oracnet does not summarise patterns from fewer than five real records or from illustrative data.`}
+        </div>
+      </section>
+
+      {template && (
+        <section className="intelligence-section">
+          <div className="section-title-text">
+            <span className="eyebrow">CAPABILITY MAP</span>
+            <h2>What an approach needs to provide</h2>
+            <p>Capabilities, not vendors. Any product that fills a slot can be evaluated in the Solution Compiler.</p>
+          </div>
+          <div className="capability-map">
+            {template.requiredCapabilities.map((capability) => (
+              <div key={capability} className="card capability-slot required"><small>Required</small><strong>{capabilityLabel(capability)}</strong><span>Satisfied by: {(template.capabilityEquivalents[capability] ?? [capability]).map(capabilityLabel).join(", ")}</span></div>
+            ))}
+            {template.optionalCapabilities.map((capability) => (
+              <div key={capability} className="card capability-slot"><small>Common, optional</small><strong>{capabilityLabel(capability)}</strong></div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="intelligence-section">
         <div className="section-title-text">
@@ -147,6 +187,23 @@ export default function UseCaseIntelligenceDetail() {
           ))}
         </div>
       </section>
+
+      {!!implementers.length && (
+        <section className="intelligence-section">
+          <div className="section-title-text">
+            <span className="eyebrow">IMPLEMENTERS</span>
+            <h2>People with published records for this outcome</h2>
+          </div>
+          <div className="grid three">
+            {implementers.map((partner) => (
+              <Link key={partner.id} className="card workspace-row" to={`/implementers/${partner.slug}`}>
+                <span className="category-icon sand"><Workflow size={20} /></span>
+                <span><strong>{partner.name}</strong><small>{relatedImplementations.filter((record) => record.implementerIds.includes(partner.id)).length} record(s) for this outcome</small></span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="implementation-request-banner">
         <div>

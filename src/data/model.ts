@@ -62,6 +62,18 @@ export interface Product extends RecordBase {
   integrations: string[];
   color: string;
   initials: string;
+  /** Lifecycle as last recorded; drives Blueprint staleness. Missing = unknown. */
+  lifecycleState?: "active" | "deprecated" | "retired";
+  /** Regions where availability has been recorded. Missing = unknown, never assumed. */
+  availableRegions?: string[];
+  /** Deployment models recorded for the product, e.g. "cloud", "self-hosted". */
+  deploymentOptions?: string[];
+  /** Data-residency options recorded for the product, e.g. "EU", "UK", "US". */
+  dataResidencyOptions?: string[];
+  /** Skill recorded for day-to-day administration (not initial setup). */
+  operatorSkill?: "no-code" | "low-code" | "developer";
+  /** Provenance of the attributes above when they differ from the record provenance. */
+  attributeSource?: string;
 }
 export interface ProductMedia extends RecordBase {
   productId: string;

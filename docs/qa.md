@@ -1,4 +1,31 @@
-# QA record — Build marketplace release
+# QA record — implementation intelligence release
+
+Run on 2026-09-25 from `npm ci` with Node 22, Vitest, Playwright (Chromium 1194 via `CHROMIUM_EXECUTABLE_PATH`), axe-core and PGlite.
+
+| Check | Result |
+| --- | --- |
+| `npm audit --audit-level=high` | 0 vulnerabilities |
+| `npm run lint`, `npm run typecheck` | pass |
+| `npm test` | **97 passed** (32 baseline + 65 new): 36 intelligence domain (compiler determinism, Pareto with unknowns, hard-constraint exclusion, substitution re-validation and de-duplication, sponsorship independence, reproducibility digests, similarity, fingerprint, metrics, staleness, rights, sanitization, attestation, PROV, CycloneDX 1.7/SPDX 2.3), 6 contribution, 4 search, 19 intelligence RLS |
+| `npm run test:e2e` | **50 passed** (24 baseline + 26 intelligence) |
+| `npm run build` | pass; 218 static route entry points; sitemap lists only public, approved records/Blueprints; `/verify/` disallowed in robots.txt and never pre-rendered |
+| Secret scan | no key/token patterns; only the anon key and URL are `VITE_*` |
+
+**RLS (PGlite, migrations 0001–0003).** The 19 tests cover: claims cannot target or be moved to another owner's subject; accepted claims reset when material fields change; owners cannot self-assign evidence levels or trusted fields; approved records, Blueprints and their child rows return to moderation after material edits; attestations cannot be inserted as submitted and can only be revoked by owners; `claim_evidence` cannot attach to others' claims or storage paths; audit/verification/review rows are append-only; anonymous users see only public approved rows; `implementation_customer_identities` is readable by its owner only and `attestation_contacts` by the service role only; solution runs cannot reference another user's profile; the Blueprint publication gate requires sanitization and rights confirmation.
+
+**E2E intelligence coverage.** URL-persisted discovery filters → comparison with MISSING / NOT DISCLOSED / NOT COMPARABLE; metric provenance drawer, claim evidence and keyboard/list architecture map; Blueprint versions, rights and manifest downloads; free-text → editable INFERRED requirements → feasible, explained options, substitution and decision trace; hard-constraint exclusion with reasons; the 15-step wizard to a moderation-pending record without leaking the private customer name; scoped, single-use attestation; claim-level review appearing in the audit log; unified search and explicit 404s; homepage intent handoff; 360 px mobile flows with a filter bottom sheet.
+
+**Accessibility.** axe (`wcag2a`, `wcag2aa`, `wcag21aa`, `wcag22aa`) reports no violations on 13 intelligence states (the list above plus compiler results) and the 9 baseline pages. Two pre-existing contrast failures were fixed. Automated checks do not establish full WCAG 2.2 AA conformance; a manual screen-reader pass has not been done.
+
+**Responsive and visual.** Overflow checks at 1440, 1280, 1024, 768, 430, 390 and 360 px for the baseline pages; intelligence pages checked at 360 px in E2E, plus a manual screenshot sweep of 23 pages at 1440 and 360 px with no console errors. Fixed during QA: legacy CSS collisions (candidate header, relationship cards, claim rows), Blueprint metadata overflow, provider compatibility overflow on mobile, nested step-label styling. Unused intelligence CSS was removed.
+
+**Defects found by tests and fixed.** Duplicate candidate ids after substituting into an already-shown combination; homepage intent ignored by the compiler; `"us"` matched as a region; stemmer mismatch (automation/automate); customer-attested search too permissive; wizard save order that would violate FK/ownership triggers in connected mode; postbuild failing under Node because of an extensionless import.
+
+**Not verified here.** Hybrid RRF search (`202609250004`, needs pgvector); Edge Functions `attestation` and `evidence` against a provisioned Supabase project and mail provider; signed Storage uploads; multi-user connected-mode RLS on real Postgres; performance was not re-measured in this release (previous local sample below; the main bundle is 454 kB / 143 kB gzip, and intelligence routes and the architecture map load lazily).
+
+---
+
+# QA record — Build marketplace release (previous)
 
 Validated with Node 24, Chromium 153, Playwright, Vitest, Testing Library, axe-core and embedded PostgreSQL (PGlite).
 
