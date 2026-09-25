@@ -87,6 +87,13 @@ export interface ImplementationContext extends IntelligenceRecord {
   workflowCharacteristics: string[];
 }
 
+export interface ContextSimilarity {
+  score: number;
+  level: "high" | "medium" | "low";
+  reasons: string[];
+  differences: string[];
+}
+
 export interface ImplementationUseCase extends IntelligenceRecord {
   implementationId: string;
   useCaseId: string;
