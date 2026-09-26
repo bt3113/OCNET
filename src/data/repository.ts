@@ -59,13 +59,17 @@ export class DemoRepository implements Repository {
         creator_profiles: marketplaceCreators,
         build_offers: marketplaceOffers,
       };
-      const current = (parsed as { id: string; provenance?: string }[]).filter(
-        (row) => !retiredRecord(table, row) && !sourcedVendorRecord(table, row),
-      );
-      return [
-        ...current,
-        ...(additions[table] ?? []).filter((x) => !current.some((v) => v.id === x.id)),
-      ] as Tables[K][];
+      const stored = parsed as { id: string; provenance?: string; listing?: { status?: string } }[];
+      const current = stored.filter((row) => !retiredRecord(table, row) && !sourcedVendorRecord(table, row));
+      const merged = [...current, ...(additions[table] ?? []).filter((x) => !current.some((v) => v.id === x.id))] as Tables[K][];
+      // Sourced vendor content refreshes from source, but an approved profile claim is the
+      // visitor's own state and survives the refresh.
+      if (table !== "providers") return merged;
+      return merged.map((row) => {
+        const previous = stored.find((item) => item.id === row.id && sourcedVendorRecord(table, item) && item.listing?.status === "claimed");
+        const provider = row as Tables["providers"];
+        return (previous && provider.listing ? { ...provider, listing: { ...provider.listing, status: "claimed" } } : row) as Tables[K];
+      });
     } catch {
       throw new Error(
         "Stored demo data could not be read. Export or reset demo data in Settings.",

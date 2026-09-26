@@ -125,3 +125,31 @@ describe("moderation: restore and label audit", () => {
     await expect(t.db.exec(`insert into public.use_case_aliases(id,name,"useCaseId",label,"aliasType","normalizedLabel") values('al-y','x','chase','xx','alternate','xx')`)).rejects.toThrow();
   });
 });
+
+describe("Technology Vendor claims", () => {
+  const claim = (id: string, extra = "") =>
+    `insert into public.provider_claims(id,name,"providerId","ownerId",evidence,domain,"contactEmail"${extra ? "," + extra.split("|")[0] : ""}) values('${id}','Claim','acme','${owner}','I run product marketing at Acme Corp.','acme.com','me@acme.com'${extra ? "," + extra.split("|")[1] : ""})`;
+  it("requires the vendor's own domain and an email at it, and never lets the claimant self-verify", async () => {
+    await t.asOwner();
+    await t.db.exec(`insert into public.providers(id,data,published) values('acme','{"name":"Acme","website":"https://www.acme.com/products","description":"Acme tools"}',true)`);
+    await t.as(owner);
+    await t.db.exec(claim("c1"));
+    const [{ token }] = await t.rows<{ token: string }>(`select "verificationToken" token from public.provider_claims where id='c1'`);
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    await expect(t.db.exec(claim("c2").replace("'acme.com'", "'evil.com'"))).rejects.toThrow(/own domain/);
+    await expect(t.db.exec(claim("c3").replace("'me@acme.com'", "'me@gmail.com'"))).rejects.toThrow(/work email/);
+    await expect(t.db.exec(claim("c4", `"dnsResult","dnsVerifiedAt"|'verified',now()`))).rejects.toThrow(/reviewer/);
+    await expect(t.db.exec(`update public.provider_claims set status='approved' where id='c1'`)).resolves.toBeDefined();
+    expect((await t.rows<{ s: string }>(`select status s from public.provider_claims where id='c1'`))[0].s).toBe("pending");
+  });
+  it("approves only after a verified DNS check, then marks the listing claimed", async () => {
+    await asAdmin();
+    await expect(t.db.exec(`update public.provider_claims set status='approved' where id='c1'`)).rejects.toThrow(/provider_claim_approval_verified/);
+    await t.db.exec(`update public.provider_claims set "dnsResult"='verified', "dnsCheckedAt"=now(), "dnsVerifiedAt"=now(), "dnsDetail"='Found' where id='c1'`);
+    await t.db.exec(`update public.provider_claims set status='approved' where id='c1'`);
+    const [{ listing }] = await t.rows<{ listing: { status: string; claimId: string; sources: unknown[] } }>(`select data->'listing' listing from public.providers where id='acme'`);
+    expect(listing).toMatchObject({ status: "claimed", claimId: "c1" });
+    expect(listing.sources).toHaveLength(1);
+    expect((await t.rows(`select 1 from public.audit_events where "entityId"='c1' and "entityType"='provider_claims'`)).length).toBeGreaterThan(0);
+  });
+});

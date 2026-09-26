@@ -125,3 +125,61 @@ end $$;
 revoke execute on function public.audit_use_case_alias() from public, anon, authenticated;
 create trigger audit_use_case_alias after insert or update or delete on public.use_case_aliases
   for each row execute function public.audit_use_case_alias();
+
+-- ───────────── Technology Vendor claims: domain + DNS verification ─────────────
+-- Claimants prove control of the vendor's own domain with a TXT record at
+-- _oracnet-verification.<domain>. Only a reviewer records the DNS result; approval
+-- requires a verified result and marks the vendor listing as claimed.
+alter table public.provider_claims
+  add column if not exists domain text check (domain is null or domain ~ '^([a-z0-9-]{1,63}\.)+[a-z]{2,63}$'),
+  add column if not exists "contactEmail" text check ("contactEmail" is null or length("contactEmail") <= 254),
+  add column if not exists "verificationToken" text not null default replace(gen_random_uuid()::text, '-', ''),
+  add column if not exists "dnsResult" text check ("dnsResult" is null or "dnsResult" in ('verified','not-found','error')),
+  add column if not exists "dnsCheckedAt" timestamptz,
+  add column if not exists "dnsVerifiedAt" timestamptz,
+  add column if not exists "dnsDetail" text check ("dnsDetail" is null or length("dnsDetail") <= 500);
+-- New approvals need a verified DNS check (existing rows are left as they were).
+alter table public.provider_claims add constraint provider_claim_approval_verified
+  check (status <> 'approved' or ("dnsVerifiedAt" is not null and "dnsResult" = 'verified')) not valid;
+
+create or replace function public.guard_provider_claim() returns trigger
+language plpgsql security invoker set search_path='' as $$
+declare site_host text;
+begin
+  if current_user in ('postgres','supabase_admin') or auth.role() = 'service_role' or public.is_admin() then return new; end if;
+  -- Claimants never record their own verification.
+  if new."dnsResult" is not null or new."dnsCheckedAt" is not null or new."dnsVerifiedAt" is not null or new."dnsDetail" is not null then
+    raise exception 'Only a reviewer records the DNS check';
+  end if;
+  select lower(substring(p.data->>'website' from '^https?://(?:www\.)?([^/:?#]+)')) into site_host from public.providers p where p.id = new."providerId";
+  if new.domain is null or site_host is null or not (site_host = new.domain or site_host like '%.' || new.domain) then
+    raise exception 'The claim domain must be the vendor''s own domain';
+  end if;
+  if new."contactEmail" is null or not (lower(new."contactEmail") like '%@' || new.domain or lower(new."contactEmail") like '%.' || new.domain) then
+    raise exception 'Use a work email address at the claimed domain';
+  end if;
+  return new;
+end $$;
+create trigger guard_provider_claim before insert or update on public.provider_claims
+  for each row execute function public.guard_provider_claim();
+
+create or replace function public.apply_provider_claim() returns trigger
+language plpgsql security definer set search_path='' as $$
+begin
+  if new.status = 'approved' and old.status is distinct from 'approved' then
+    update public.providers p
+       set data = p.data || jsonb_build_object('listing',
+             jsonb_build_object('compiledBy','Oracnet','sourcedAt', to_char(now(),'YYYY-MM-DD'),
+                                'sources', jsonb_build_array(jsonb_build_object('label', p.data->>'name' || ' website', 'url', p.data->>'website')),
+                                'tagline', p.data->>'description', 'about', p.data->>'description')
+             || coalesce(p.data->'listing','{}'::jsonb)
+             || jsonb_build_object('status','claimed','claimedAt', now(), 'claimId', new.id))
+     where p.id = new."providerId";
+    insert into public.audit_events(id,name,provenance,"actorId","entityId","entityType",action,at)
+    values(gen_random_uuid()::text,'Vendor claim approved','verified',auth.uid(),new.id,'provider_claims','approved for ' || new.domain,now());
+  end if;
+  return null;
+end $$;
+revoke execute on function public.apply_provider_claim() from public, anon, authenticated;
+create trigger apply_provider_claim after update of status on public.provider_claims
+  for each row execute function public.apply_provider_claim();

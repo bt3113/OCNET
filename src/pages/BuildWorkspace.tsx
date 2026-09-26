@@ -40,7 +40,6 @@ export default function BuildWorkspace() {
   const { data: products = [] } = useRecords("products");
   const { data: providers = [] } = useRecords("providers");
   const { data: reports = [] } = useRecords("reports");
-  const { data: claims = [] } = useRecords("provider_claims");
   const { data: audits = [] } = useRecords("audit_events");
   const { data: comments = [] } = useRecords("build_comments");
   const { data: saves = [] } = useRecords("saved_items");
@@ -53,7 +52,6 @@ export default function BuildWorkspace() {
     null,
   );
   const [providerId, setProviderId] = useState("");
-  const [evidence, setEvidence] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const creator = creators.find((c) => c.ownerId === userId);
   const mine = builds.filter(
@@ -330,68 +328,6 @@ export default function BuildWorkspace() {
                   />
                 )}
               </>
-            ) : section === "claims" ? (
-              <>
-                {claims.length ? (
-                  <DataTable
-                    headings={[
-                      "Provider",
-                      "Claim evidence",
-                      "Status",
-                      "Review",
-                    ]}
-                    rows={claims.map((c) => [
-                      providers.find((p) => p.id === c.providerId)?.name,
-                      c.evidence,
-                      c.status,
-                      <div className="row">
-                        <button
-                          className="button light"
-                          onClick={async () => {
-                            await actions.save("provider_claims", {
-                              ...c,
-                              status: "approved",
-                            });
-                            await audit(
-                              c.id,
-                              "provider_claims",
-                              "approve claim",
-                            );
-                            notify(
-                              "Claim reviewed. Ownership grants require a separate trusted membership change.",
-                            );
-                          }}
-                        >
-                          Approve claim
-                        </button>
-                        <button
-                          className="button light"
-                          onClick={async () => {
-                            await actions.save("provider_claims", {
-                              ...c,
-                              status: "rejected",
-                            });
-                            await audit(
-                              c.id,
-                              "provider_claims",
-                              "reject claim",
-                            );
-                          }}
-                        >
-                          Reject claim
-                        </button>
-                      </div>,
-                    ])}
-                  />
-                ) : (
-                  <EmptyState
-                    title="No ownership claims"
-                    description="Claimants can submit supporting evidence from their provider workspace."
-                    to="/provider/claims"
-                    action="View claim workflow"
-                  />
-                )}
-              </>
             ) : null}
             <h2 className="subheading">Moderation audit trail</h2>
             <div className="card">
@@ -459,76 +395,6 @@ export default function BuildWorkspace() {
       </>
     );
   }
-  if (area === "provider" && section === "claims")
-    return (
-      <>
-        <WorkspaceNotice />
-        <PageHeading
-          eyebrow="PROVIDER WORKSPACE"
-          title="Claim your provider profile"
-          description="Submit evidence of your authority to represent an organization."
-        />
-        <form
-          className="card form-card"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            await actions.save("provider_claims", {
-              id: crypto.randomUUID(),
-              name: "Provider ownership claim",
-              providerId,
-              ownerId: userId,
-              evidence,
-              status: "pending",
-              provenance: isSupabase ? "vendor supplied" : "demo",
-            });
-            setEvidence("");
-            notify("Claim submitted for review");
-          }}
-        >
-          <label>
-            Provider
-            <select
-              required
-              value={providerId}
-              onChange={(e) => setProviderId(e.target.value)}
-            >
-              <option value="">Choose provider</option>
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Evidence of representation
-            <textarea
-              required
-              minLength={20}
-              maxLength={3000}
-              value={evidence}
-              onChange={(e) => setEvidence(e.target.value)}
-              placeholder="Describe your role and provide a public company reference. Do not submit identity documents in the demo."
-            />
-          </label>
-          <button className="button dark">Submit ownership claim</button>
-          <p>
-            Approval does not grant the right to remove independent builds.
-            Corrections go through moderation.
-          </p>
-        </form>
-        <DataTable
-          headings={["Claim", "Status", "Submitted evidence"]}
-          rows={claims
-            .filter((c) => c.ownerId === userId)
-            .map((c) => [
-              providers.find((p) => p.id === c.providerId)?.name,
-              c.status,
-              c.evidence,
-            ])}
-        />
-      </>
-    );
   if (area === "provider" && section === "builds") {
     const matching = builds.filter(
       (b) =>

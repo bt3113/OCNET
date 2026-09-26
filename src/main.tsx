@@ -25,6 +25,7 @@ const Collections = lazy(() => import("./pages/Collections"));
 const BuildWorkspace = lazy(() => import("./pages/BuildWorkspace"));
 const BuildWizard = lazy(() => import("./pages/BuildWizard"));
 const UseCaseModeration = lazy(() => import("./pages/UseCaseModeration"));
+const VendorClaims = lazy(() => import("./pages/VendorClaims"));
 const Home = lazy(() => import("./pages/Home"));
 const Discovery = lazy(() => import("./pages/Discovery"));
 const Details = lazy(() => import("./pages/Details"));
@@ -251,6 +252,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <Route key={p + "-slug"} path={p + "/:slug"} element={<LegacyRedirect />} />
                     ))}
                     <Route path="admin/use-cases" element={<UseCaseModeration />} />
+                    <Route path="admin/vendor-claims" element={<VendorClaims />} />
+                    <Route path="provider/claims" element={<VendorClaims />} />
                     <Route path="search" element={<SearchPage />} />
                     {["builds", "explore"].map((p) => (
                       <Route key={p} path={p} element={<BuildDiscovery />} />
@@ -271,8 +274,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                           !p.endsWith("/messages") &&
                           !intelligenceWorkspaceRoutes.has(p),
                       ),
-                      ...buildAdminRoutes.filter((p) => !intelligenceWorkspaceRoutes.has(p)),
-                      ...buildProviderRoutes.filter((p) => !intelligenceWorkspaceRoutes.has(p)),
+                      ...buildAdminRoutes.filter((p) => !intelligenceWorkspaceRoutes.has(p) && p !== "/admin/vendor-claims"),
+                      ...buildProviderRoutes.filter((p) => !intelligenceWorkspaceRoutes.has(p) && p !== "/provider/claims"),
                     ].map((p) => (
                       <Route key={p} path={p} element={<BuildWorkspace />} />
                     ))}

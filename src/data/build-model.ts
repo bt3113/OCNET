@@ -192,6 +192,15 @@ export interface ProviderClaim extends RecordBase {
   ownerId: string;
   evidence: string;
   status: Moderation;
+  /** Company domain the claimant controls; must be the vendor's own domain. */
+  domain?: string;
+  contactEmail?: string;
+  /** Published by the claimant as a TXT record at _oracnet-verification.<domain>. */
+  verificationToken?: string;
+  dnsResult?: "verified" | "not-found" | "error" | null;
+  dnsCheckedAt?: string | null;
+  dnsVerifiedAt?: string | null;
+  dnsDetail?: string | null;
 }
 export interface AuditEvent extends RecordBase {
   actorId: string;
