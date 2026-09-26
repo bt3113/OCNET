@@ -1,0 +1,25 @@
+/* Solution Compiler: coverage notice and candidate provenance. */
+.coverage-line{display:flex;align-items:flex-start;gap:8px;margin:14px 0 4px;font-size:13px;line-height:1.5;color:#3f3b37}
+.coverage-line svg{flex:none;margin-top:2px;color:#786436}
+.coverage-line.muted{color:#655a57}
+.coverage-notice{margin:16px 0 4px;padding:18px 20px;border:1px solid #e9dfca;border-radius:14px;background:#fffaf0}
+.coverage-notice h3{display:flex;align-items:flex-start;gap:9px;margin:0 0 8px;font-size:16px;line-height:1.35}
+.coverage-notice h3 svg{flex:none;margin-top:2px;color:#786436}
+.coverage-notice p{margin:0 0 12px;font-size:13px;line-height:1.6;color:#4a443f;max-width:70ch}
+.coverage-links{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin:0 0 12px;padding:0;list-style:none}
+.coverage-links a:not(.button){font-weight:600;color:#1f1a17;text-decoration:underline;text-underline-offset:3px}
+.coverage-links a:focus-visible,.coverage-secondary a:focus-visible,.candidate-provenance a:focus-visible{outline:2px solid #1f1a17;outline-offset:2px;border-radius:4px}
+.coverage-notice .coverage-secondary{margin:0;font-size:12px;color:#655a57}
+.coverage-secondary a{color:#1f1a17;text-decoration:underline;text-underline-offset:3px}
+
+.candidate-provenance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin:0;padding:10px 12px;border-radius:10px;background:#f8f5ee}
+.candidate-provenance dt{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#655a57}
+.candidate-provenance dd{margin:2px 0 0;font-size:12px;font-weight:600;overflow-wrap:anywhere}
+.candidate-provenance a{color:#1f1a17;text-decoration:underline;text-underline-offset:2px}
+.candidate-provenance .muted{font-weight:500;color:#655a57}
+
+@media (max-width:520px){
+  .coverage-notice{padding:16px}
+  .coverage-links{flex-direction:column;align-items:flex-start}
+  .candidate-provenance{grid-template-columns:1fr}
+}

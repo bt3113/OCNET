@@ -25,11 +25,15 @@ import type {
   SolutionRun,
   TechnologyRelationship,
 } from "./intelligence-model";
-import type { Product } from "./model";
+import type { Build } from "./build-model";
+import type { Product, UseCase } from "./model";
+import type { UseCaseCategory } from "./marketplace-model";
 import { strengthOf, validateProfile } from "./requirement";
 import { canReuse } from "./rights";
 import { blueprintFreshness } from "./staleness";
 import { capabilityLabel, normalizeSystemName, regionInfo } from "./taxonomy";
+import { approvedUseCases, compilerCoverage, type CompilerCoverage } from "./use-case-domain";
+import { providerForMaintainer, type SolutionProvider } from "./solution-providers";
 
 /**
  * Solution Compiler V1.
@@ -40,10 +44,14 @@ import { capabilityLabel, normalizeSystemName, regionInfo } from "./taxonomy";
  * objective values → Pareto (non-dominated) filtering → supported trade-off labels
  * → structured explanation → reproducible decision trace.
  *
+ * Supply is never fabricated: only published, approved Blueprints for the
+ * requirement's own Use Case enter the candidate pool. A Use Case without one
+ * yields zero candidates rather than borrowing another Use Case's Blueprints.
+ *
  * No model call, no sponsorship input and no hidden weighted score.
  */
 export const COMPILER_ENGINE_VERSION = "1.0.0";
-export const COMPILER_RULESET_VERSION = "2026-09-25.1";
+export const COMPILER_RULESET_VERSION = "2026-09-26.1";
 export const MAX_ASSIGNMENTS_PER_BLUEPRINT = 48;
 export const MAX_DOMINATED_SHOWN = 6;
 
@@ -666,8 +674,16 @@ export function compileSolutions(
       exclusions.push({ id: blueprint.id, blueprintId: blueprint.id, reason: "Blueprint is archived." });
       continue;
     }
-    if (profile.useCaseId && blueprint.useCaseIds.length && !blueprint.useCaseIds.includes(profile.useCaseId)) {
-      exclusions.push({ id: blueprint.id, blueprintId: blueprint.id, reason: `Addresses a different outcome (${blueprint.useCaseIds.join(", ")}).` });
+    if (!profile.useCaseId) {
+      exclusions.push({ id: blueprint.id, blueprintId: blueprint.id, reason: "No Use Case selected; only Blueprints published for the requirement’s Use Case are considered." });
+      continue;
+    }
+    if (!blueprint.useCaseIds.includes(profile.useCaseId)) {
+      exclusions.push({
+        id: blueprint.id,
+        blueprintId: blueprint.id,
+        reason: blueprint.useCaseIds.length ? `Addresses a different outcome (${blueprint.useCaseIds.join(", ")}).` : "Not linked to any Use Case.",
+      });
       continue;
     }
     const slots = buildSlots(profile, catalogue, version.id);
@@ -675,7 +691,7 @@ export function compileSolutions(
     pool.push({ blueprintId: blueprint.id, versionId: version.id, assignments: assignments.length, truncated });
     for (const assignment of assignments) evaluated.push(evaluateAssignment(ctx, blueprint, version, assignment));
   }
-  stages.push({ id: "blueprints", label: "Evaluating Blueprint patterns", detail: `${pool.length} Blueprint${pool.length === 1 ? "" : "s"} in scope; ${evaluated.length} component combinations enumerated from recorded alternatives.` });
+  stages.push({ id: "blueprints", label: "Evaluating Blueprint patterns", detail: `${pool.length} published Blueprint${pool.length === 1 ? "" : "s"} for this Use Case; ${evaluated.length} component combinations enumerated from recorded alternatives.` });
 
   for (const candidate of evaluated.filter((item) => !item.feasible)) {
     const reasons = candidate.constraintResults.filter((result) => result.strength === "hard" && result.outcome === "violated");
@@ -837,4 +853,101 @@ export function verifyReproducibility(run: SolutionRun, catalogue: CompilerCatal
   return again.run.resultDigest === run.resultDigest
     ? { reproducible: true, reason: "Re-running the stored snapshot produced an identical result digest." }
     : { reproducible: false, reason: "Result digest differs from the stored run." };
+}
+
+// ───────────── Coverage and provenance (marketplace supply, not ranking) ─────────────
+
+const isPublishedBlueprint = (blueprint: Blueprint) => blueprint.publicationState === "published" && blueprint.moderationState === "approved";
+const isPublicBuild = (build: Build) => build.visibility === "public" && build.publication === "published" && build.moderation === "approved";
+
+export interface CompilerSupply {
+  coverage: CompilerCoverage;
+  /** Published, approved Blueprints that address the Use Case. */
+  blueprintIds: string[];
+  /** Public Implementation Records linked to the Use Case. */
+  implementationIds: string[];
+}
+
+type SupplyCatalogue = Pick<CompilerCatalogue, "blueprints" | "implementations" | "implementationUseCases">;
+
+/** What the compiler can honestly offer for a Use Case, with the facts behind it. */
+export function compilerSupply(useCaseId: string, catalogue: SupplyCatalogue): CompilerSupply {
+  const links = catalogue.implementationUseCases ?? [];
+  const coverage = compilerCoverage(useCaseId, { blueprints: catalogue.blueprints, implementations: catalogue.implementations, implementationUseCases: links });
+  const recordIds = new Set(links.filter((link) => link.useCaseId === useCaseId).map((link) => link.implementationId));
+  return {
+    coverage,
+    blueprintIds: catalogue.blueprints.filter((blueprint) => isPublishedBlueprint(blueprint) && blueprint.useCaseIds.includes(useCaseId)).map((blueprint) => blueprint.id).sort(),
+    implementationIds: catalogue.implementations.filter((record) => recordIds.has(record.id) && isPublicImplementation(record)).map((record) => record.id).sort(),
+  };
+}
+
+/** A catalogue-only Use Case has nothing to compile; the page shows the coverage notice instead. */
+export const canCompileFor = (supply: CompilerSupply | null | undefined) => !!supply && supply.coverage !== "catalogue-only";
+
+export const coverageLabels: Record<CompilerCoverage, string> = {
+  "catalogue-only": "catalogue only",
+  "blueprint-available": "Blueprint available",
+  "evidence-available": "evidence available",
+};
+
+export interface UseCaseOption {
+  useCase: UseCase;
+  coverage: CompilerCoverage;
+  label: string;
+}
+export interface UseCaseOptionGroup {
+  id: string;
+  label: string;
+  options: UseCaseOption[];
+}
+
+/** Every approved Use Case, grouped by top-level category, each labelled with its factual coverage. */
+export function groupUseCaseOptions(useCases: UseCase[], categories: UseCaseCategory[], catalogue: SupplyCatalogue): UseCaseOptionGroup[] {
+  const topLevel = categories.filter((category) => category.level === "category").sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  const groups = new Map<string, UseCaseOptionGroup>(topLevel.map((category) => [category.id, { id: category.id, label: category.name, options: [] }]));
+  const other: UseCaseOptionGroup = { id: "uncategorised", label: "Other", options: [] };
+  for (const useCase of approvedUseCases(useCases)) {
+    const coverage = compilerSupply(useCase.id, catalogue).coverage;
+    const group = (useCase.categoryId && groups.get(useCase.categoryId)) || other;
+    group.options.push({ useCase, coverage, label: `${useCase.name} · ${coverageLabels[coverage]}` });
+  }
+  return [...groups.values(), other]
+    .filter((group) => group.options.length)
+    .map((group) => ({ ...group, options: [...group.options].sort((a, b) => a.useCase.name.localeCompare(b.useCase.name)) }));
+}
+
+export interface ProvenanceSources {
+  blueprints: Blueprint[];
+  builds: Build[];
+  providers: SolutionProvider[];
+  implementations: ImplementationRecord[];
+}
+
+export interface CandidateProvenance {
+  blueprint?: Blueprint;
+  /** Solution Provider that publishes or maintains the Blueprint, when listed. */
+  provider?: SolutionProvider;
+  /** Public Build the Blueprint explains. */
+  build?: Build;
+  /** Public Implementation Records from which this Blueprint was derived. */
+  evidence: ImplementationRecord[];
+}
+
+/** Where a candidate comes from: its Blueprint, that Blueprint's maintainer and Build, and the records behind it. */
+export function candidateProvenance(blueprintId: string | undefined, sources: ProvenanceSources): CandidateProvenance {
+  const blueprint = blueprintId ? sources.blueprints.find((item) => item.id === blueprintId) : undefined;
+  if (!blueprint) return { evidence: [] };
+  const publicBuilds = sources.builds.filter(isPublicBuild);
+  const build =
+    (blueprint.buildId ? publicBuilds.find((item) => item.id === blueprint.buildId) : undefined) ??
+    publicBuilds.find((item) => item.blueprintId === blueprint.id);
+  return {
+    blueprint,
+    provider: providerForMaintainer(sources.providers, blueprint.maintainerId),
+    build,
+    evidence: sources.implementations
+      .filter((record) => isPublicImplementation(record) && (record.derivedBlueprintIds ?? []).includes(blueprint.id))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+  };
 }

@@ -18,6 +18,7 @@ import {
 import "./styles.css";
 import "./intelligence.css";
 import "./structure.css";
+import "./compiler-coverage.css";
 const BuildDiscovery = lazy(() => import("./pages/BuildDiscovery"));
 const BuildDetail = lazy(() => import("./pages/BuildDetail"));
 const Creators = lazy(() => import("./pages/Creators"));
