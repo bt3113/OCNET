@@ -67,7 +67,7 @@ Move to a host supporting server-rendered entity metadata, security headers and 
 - [QA evidence and limits](docs/qa.md)
 - [Implementation intelligence](docs/implementation-intelligence.md) · [records](docs/implementation-records.md) · [metrics](docs/metric-model.md) · [verification](docs/verification-model.md) · [provenance](docs/provenance-model.md) · [Blueprints](docs/blueprints.md) · [Solution Compiler](docs/solution-compiler.md)
 - [Marketplace domain model](docs/marketplace-domain-model.md) · [Use Case taxonomy](docs/use-case-taxonomy.md) · [Supply model](docs/supply-model.md) · [Technology Vendor profiles (xAI / Grok)](docs/provider-listings.md)
-- [Production architecture](docs/production-architecture.md) · [research notes](docs/technical-research-notes.md) · [progress and open gaps](docs/implementation-progress.md)
+- [Production architecture](docs/production-architecture.md) · [research notes](docs/technical-research-notes.md) · [progress and open gaps](docs/implementation-progress.md) · **[Handover: what is live and what is pending](docs/handover.md)**
 
 ## Marketplace: Use Cases, Builds and Solution Providers
 
