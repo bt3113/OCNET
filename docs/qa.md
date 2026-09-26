@@ -17,8 +17,8 @@ Run locally with Node 22, Vitest, PGlite and Playwright (Chromium 1194 via `CHRO
 - E: a Build joins an xAI-origin Use Case (0 → 1).
 - F: Build detail tabs, maturity and proof.
 - G: Solution Compiler coverage, including the catalogue-only notice.
-- H: overflow checks at 1440/1280/1024/768/430/390/360 px on 21 pages.
-- I: axe (`wcag2a/aa`, `wcag21aa`, `wcag22aa`) on 24 pages and states, including the publisher with the listbox open.
+- H: overflow checks at 1440/1280/1024/768/430/390/360 px on 18 pages.
+- I: axe (`wcag2a/aa`, `wcag21aa`, `wcag22aa`) on 18 marketplace pages, 3 vendor pages, the publisher with the listbox open, compiler coverage states and the existing intelligence states.
 
 **Independent review.** A review pass found 11 issues, all fixed with tests:
 - proposal provenance and dates could be forged;
