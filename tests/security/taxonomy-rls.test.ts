@@ -40,7 +40,7 @@ beforeAll(async () => {
   for (const name of ["202609230001_marketplace.sql", "202609240001_build_graph.sql"]) await db.exec(migration(name));
   const search = migration("202609240002_search.sql");
   await db.exec(search.slice(search.indexOf("create or replace view"), search.indexOf("-- Server-only")));
-  for (const name of ["202609250001_implementation_intelligence.sql", "202609250002_intelligence_search.sql", "202609250003_intelligence_hardening.sql", "202609260001_marketplace_taxonomy.sql"])
+  for (const name of ["202609250001_implementation_intelligence.sql", "202609250002_intelligence_search.sql", "202609250003_intelligence_hardening.sql", "202609260001_marketplace_taxonomy.sql", "202609270001_marketplace_followups.sql"])
     await db.exec(migration(name));
   await db.exec(`grant usage on schema public,auth,storage to anon,authenticated,service_role;
      grant select,insert,update,delete on all tables in schema public to anon,authenticated,service_role;`);

@@ -41,7 +41,7 @@ Free guides, templates, source packages, starter kits, setup, customization, ful
 Apply migrations in order, then `seed.sql` for the labelled technology catalogue. `seed-builds.sql` is optional and must be run as an administrator with three existing test Auth UUIDs:
 
 ```sh
-psql "$DATABASE_URL" -v demo_owner_id=UUID -v demo_studio_id=UUID -v demo_maya_id=UUID -f supabase/seed-builds.sql
+psql "$DATABASE_URL" -v demo_owner_id=UUID -v demo_studio_id=UUID -v demo_maya_id=UUID -v demo_atlas_id=UUID -f supabase/seed-builds.sql
 ```
 
 It does not create accounts/passwords. Use an isolated staging database. Database credentials stay outside the browser and repository. Grant roles/memberships through trusted administration. Configure GitHub OAuth callback and allowed app redirects before enabling Auth. Test signed upload/read, Realtime and OAuth against the provisioned project; local PostgreSQL tests do not substitute for these external acceptance tests.

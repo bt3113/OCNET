@@ -16,6 +16,7 @@ import {
   makePrimary,
   mapProposal,
   mergeUseCases,
+  proposalNotification,
   resolveUseCase,
   suggestUseCases,
   supplyGaps,
@@ -153,6 +154,17 @@ describe("Proposals and merges", () => {
     const approved = approveProposal(forged, { title: "Send invoices and record payments", description: "Issue invoices and record payments.", categoryId: "finance", subcategoryId: "fin-ar" }, undefined, "admin", []);
     expect(approved.useCase!.provenance).toBe("community supplied");
     expect(approved.sources[0].provenance).toBe("community supplied");
+  });
+  it("tells the proposer what happened, with a link to act on", () => {
+    const target = useCases.find((useCase) => useCase.id === "chase-overdue-invoices")!;
+    const mapped = proposalNotification({ ...proposal, status: "mapped", reviewNote: "Same work" }, target);
+    expect(mapped).toMatchObject({ name: "Use Case proposal matched", href: `/use-cases/${target.slug}`, read: false });
+    expect(mapped.body).toContain(target.name);
+    expect(mapped.body).toContain("Moderator note: Same work");
+    const rejected = proposalNotification({ ...proposal, status: "rejected", reviewNote: "Too broad" });
+    expect(rejected).toMatchObject({ name: "Use Case proposal not approved", href: `/creator/builds/${proposal.buildId}/edit` });
+    expect(rejected.body).toContain("Too broad");
+    expect(rejected.body).toContain("keeps its other Use Cases");
   });
   it("follows chained merges to the surviving Use Case", () => {
     const [a, b, c] = useCases.slice(0, 3);

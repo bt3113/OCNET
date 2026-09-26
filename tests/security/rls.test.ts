@@ -29,8 +29,20 @@ beforeAll(async () => {
   await db.exec(
     readFileSync("supabase/migrations/202609240001_build_graph.sql", "utf8"),
   );
+  // The catalogue seed targets the full schema, so apply every later migration too
+  // (the search view without its pgvector-only parts, as in the other security suites).
+  const search = readFileSync("supabase/migrations/202609240002_search.sql", "utf8");
+  await db.exec(search.slice(search.indexOf("create or replace view"), search.indexOf("-- Server-only")));
+  for (const name of [
+    "202609250001_implementation_intelligence.sql",
+    "202609250002_intelligence_search.sql",
+    "202609250003_intelligence_hardening.sql",
+    "202609260001_marketplace_taxonomy.sql",
+    "202609270001_marketplace_followups.sql",
+  ])
+    await db.exec(readFileSync(`supabase/migrations/${name}`, "utf8"));
   await db.exec(
-    `grant usage on schema public,auth,storage to anon,authenticated;grant select,insert,update,delete on all tables in schema public to anon,authenticated;insert into public.categories(id,data,published) values('ai-software','{"name":"AI"}',true);insert into public.providers(id,data,published) values('vendor','{"name":"Vendor"}',true);insert into public.products(id,data,published) values('tool','{"name":"Tool","providerId":"vendor"}',true);insert into public.capabilities(id,data,published) values('cap','{"name":"Capability"}',true);insert into public.use_cases(id,data,published) values('case','{"name":"Case"}',true);insert into public.creator_profiles(id,slug,name,"ownerId") values('creator','creator','Test Creator','${owner}');insert into public.builds(id,slug,name,"ownerId","creatorId",category) values('private-build','private-build','Private draft','${owner}','creator','ai-software');insert into public.builds(id,slug,name,tagline,description,"ownerId","creatorId",category,visibility,publication,moderation,"ownershipConfirmed","cloneAllowed",license,attribution) values('public-build','public-build','Published build','A published demonstration','A sufficiently detailed implementation description for testing.','${owner}','creator','ai-software','public','published','approved',true,true,'Blueprint attribution required','Original creator');insert into public.build_stack_items(id,"buildId","productId","capabilityId",role,evidence) values('node','public-build','tool','cap','Reasoning','creator-confirmed');insert into public.build_use_cases values('public-build','case');`,
+    `grant usage on schema public,auth,storage to anon,authenticated;grant select,insert,update,delete on all tables in schema public to anon,authenticated;insert into public.categories(id,data,published) values('ai-software','{"name":"AI"}',true);insert into public.providers(id,data,published) values('vendor','{"name":"Vendor"}',true);insert into public.products(id,data,published) values('tool','{"name":"Tool","providerId":"vendor"}',true);insert into public.capabilities(id,data,published) values('cap','{"name":"Capability"}',true);insert into public.use_cases(id,data,published) values('case','{"name":"Case"}',true);insert into public.creator_profiles(id,slug,name,"ownerId") values('creator','creator','Test Creator','${owner}');insert into public.builds(id,slug,name,"ownerId","creatorId",category) values('private-build','private-build','Private draft','${owner}','creator','ai-software');insert into public.builds(id,slug,name,tagline,description,"ownerId","creatorId",category,visibility,publication,moderation,"ownershipConfirmed","cloneAllowed",license,attribution) values('public-build','public-build','Published build','A published demonstration','A sufficiently detailed implementation description for testing.','${owner}','creator','ai-software','public','published','pending',true,true,'Blueprint attribution required','Original creator');insert into public.build_stack_items(id,"buildId","productId","capabilityId",role,evidence) values('node','public-build','tool','cap','Reasoning','creator-confirmed');insert into public.build_use_cases values('public-build','case');update public.builds set moderation='approved' where id='public-build';`,
   );
 }, 60000);
 afterAll(async () => {
@@ -196,7 +208,8 @@ describe("Build graph RLS on actual PostgreSQL", () => {
     const sql = readFileSync("supabase/seed-builds.sql", "utf8")
       .replaceAll(":'demo_owner_id'", "'" + owner + "'")
       .replaceAll(":'demo_studio_id'", "'" + other + "'")
-      .replaceAll(":'demo_maya_id'", "'" + admin + "'");
+      .replaceAll(":'demo_maya_id'", "'" + admin + "'")
+      .replaceAll(":'demo_atlas_id'", "'" + other + "'");
     await db.exec(sql);
     await identity(owner);
     const rows = await db.query<{ b: Record<string, unknown> }>(
@@ -238,17 +251,8 @@ describe("Build graph RLS on actual PostgreSQL", () => {
     ).not.toBeNull();
   });
   it("PostgreSQL full-text search observes publication and privacy policies", async () => {
+    // The search view is created with the full migration chain in beforeAll.
     await db.exec("reset role");
-    const migration = readFileSync(
-      "supabase/migrations/202609240002_search.sql",
-      "utf8",
-    );
-    await db.exec(
-      migration.slice(
-        migration.indexOf("create or replace view"),
-        migration.indexOf("-- Server-only"),
-      ),
-    );
     await db.exec(
       "grant select on public.search_documents to anon,authenticated",
     );

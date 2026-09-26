@@ -104,6 +104,11 @@ test("a proposed Use Case stays private and can be mapped to an existing one", a
   await card.getByLabel("Existing Use Case").selectOption({ label: "Chase overdue invoices" });
   await card.getByRole("button", { name: "Confirm mapping" }).click();
   await expect(page.locator(".moderation-card", { hasText: "Follow up with customers about late payments" })).toHaveCount(0);
+  // The provider is told the outcome.
+  await page.goto(`${base}/app/notifications`);
+  const notice = page.locator(".notification", { hasText: "Use Case proposal matched" });
+  await expect(notice).toContainText("Chase overdue invoices");
+  await expect(notice.getByRole("link", { name: /View details/ })).toHaveAttribute("href", /\/use-cases\//);
 
   await page.goto(buildUrl);
   await expect(page.locator("main").getByRole("link", { name: /Chase overdue invoices/ }).first()).toBeVisible();

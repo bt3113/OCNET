@@ -1,7 +1,7 @@
 import type { Build } from "./build-model";
 import type { UseCase } from "./model";
 import type { UseCaseAlias, UseCaseProposal, UseCaseSource } from "./marketplace-model";
-import { approveProposal, mapProposal, mergeUseCases, rejectProposal, type ModerationResult } from "./use-case-domain";
+import { approveProposal, mapProposal, mergeUseCases, proposalNotification, rejectProposal, type ModerationResult } from "./use-case-domain";
 import { auditEvent } from "./review";
 import { isSupabase, list, save } from "./repository";
 import { normalizeLabel } from "./use-case-text";
@@ -19,18 +19,20 @@ async function rpc(name: string, args: Record<string, unknown>) {
   return data;
 }
 
-async function applyDemo(result: ModerationResult, reviewerId: string, entityId: string, detail = "") {
+async function applyDemo(result: ModerationResult, reviewerId: string, entityId: string, detail = "", target?: Pick<UseCase, "name" | "slug">) {
   if (result.useCase) await save("use_cases", result.useCase);
   for (const source of result.sources) await save("use_case_sources", source);
   for (const alias of result.aliases) await save("use_case_aliases", alias);
   if (result.build) await save("builds", result.build);
   await save("use_case_proposals", result.proposal);
+  // The proposer is told what happened (connected mode: the database trigger does this).
+  await save("notifications", proposalNotification(result.proposal, target ?? result.useCase));
   await save("audit_events", auditEvent(reviewerId, "use-case-proposal", entityId, result.auditAction, new Date(), detail));
 }
 
 export async function moderateMap(proposal: UseCaseProposal, target: UseCase, build: Build | undefined, reviewerId: string, note = "") {
   if (isSupabase) return void (await rpc("map_use_case_proposal", { target_proposal: proposal.id, target_use_case: target.id, note }));
-  await applyDemo(mapProposal(proposal, target, build, reviewerId, note), reviewerId, proposal.id, `mapped to ${target.id}`);
+  await applyDemo(mapProposal(proposal, target, build, reviewerId, note), reviewerId, proposal.id, `mapped to ${target.id}`, target);
 }
 
 export async function moderateApprove(

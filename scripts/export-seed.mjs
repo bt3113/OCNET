@@ -44,16 +44,19 @@ for (const [table, columns] of Object.entries(typed))
     sql += `insert into public.${table}(${present.map((column) => '"' + column + '"').join(",")}) values (${values.join(",")}) on conflict do nothing;\n`;
   }
 writeFileSync("supabase/seed.sql", sql);
-// Optional Build examples require three real, explicitly supplied Auth user IDs.
+// Optional Build examples require four real, explicitly supplied Auth user IDs.
 // Run as the database administrator; never create seeded passwords or login identities.
 const quote = (value) => "'" + String(value).replaceAll("'", "''") + "'";
 const owners = {
   "demo-user": "demo_owner_id",
   "demo-studio": "demo_studio_id",
   "demo-maya": "demo_maya_id",
+  "demo-atlas": "demo_atlas_id",
 };
+for (const record of [...(seed.creator_profiles ?? []), ...(seed.builds ?? []), ...(seed.build_offers ?? [])])
+  if (!owners[record.ownerId]) throw new Error(`No psql owner variable for ${record.ownerId}; add it to owners.`);
 let graph =
-  "-- Optional fictional Build examples. Supply psql variables demo_owner_id, demo_studio_id, demo_maya_id (existing Auth UUIDs).\nBEGIN;\n";
+  "-- Optional fictional Build examples. Supply psql variables demo_owner_id, demo_studio_id, demo_maya_id, demo_atlas_id (existing Auth UUIDs).\nBEGIN;\n";
 graph += `insert into public.organizations(id,data,published,provenance) values('northstar','{"id":"northstar","name":"Northstar Studio","provenance":"demo"}',true,'demo') on conflict(id) do nothing;\n`;
 for (const c of seed.creator_profiles ?? []) {
   const keys = Object.keys(c),
@@ -68,8 +71,10 @@ for (const c of seed.creator_profiles ?? []) {
     );
   graph += `insert into public.creator_profiles(${keys.map((k) => '"' + k + '"').join(",")}) values(${values.join(",")}) on conflict(id) do nothing;\n`;
 }
+// Blueprints and Implementation Records are not part of the SQL seed, so Blueprint links
+// are left empty here; attach them after importing Blueprints.
 for (const b of seed.builds ?? [])
-  graph += `select set_config('request.jwt.claims',jsonb_build_object('sub', :'${owners[b.ownerId]}','role','service_role')::text,true);\nselect public.save_build(${quote(JSON.stringify(b))}::jsonb || jsonb_build_object('ownerId', :'${owners[b.ownerId]}'));\n`;
+  graph += `select set_config('request.jwt.claims',jsonb_build_object('sub', :'${owners[b.ownerId]}','role','service_role')::text,true);\nselect public.save_build(${quote(JSON.stringify({ ...b, blueprintId: null }))}::jsonb || jsonb_build_object('ownerId', :'${owners[b.ownerId]}'));\n`;
 for (const o of seed.build_offers ?? []) {
   const keys = Object.keys(o),
     values = keys.map((k) =>

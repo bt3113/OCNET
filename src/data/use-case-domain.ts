@@ -1,5 +1,5 @@
 import type { Build } from "./build-model";
-import type { Product, UseCase } from "./model";
+import type { Notification, Product, UseCase } from "./model";
 import type {
   Blueprint,
   BlueprintStackItem,
@@ -257,6 +257,35 @@ export interface ModerationResult {
   sources: UseCaseSource[];
   aliases: UseCaseAlias[];
   auditAction: string;
+}
+
+/**
+ * What the proposing provider is told about a moderation decision. The database creates
+ * the same notice in connected mode (trigger on use_case_proposals), so wording lives in
+ * one place per mode and never promises more than happened.
+ */
+export function proposalNotification(proposal: UseCaseProposal, target?: Pick<UseCase, "name" | "slug">): Notification {
+  const base = { id: `notification-proposal-${proposal.id}-${proposal.status}`, read: false, provenance: proposal.provenance, createdAt: proposal.reviewedAt ?? now() };
+  if (proposal.status === "mapped" && target)
+    return {
+      ...base,
+      name: "Use Case proposal matched",
+      body: `Your proposed Use Case “${proposal.suggestedTitle}” describes the existing Use Case “${target.name}”. Your Build is now listed under it.${proposal.reviewNote ? ` Moderator note: ${proposal.reviewNote}` : ""}`,
+      href: `/use-cases/${target.slug}`,
+    };
+  if (proposal.status === "approved" && target)
+    return {
+      ...base,
+      name: "Use Case proposal approved",
+      body: `“${target.name}” is now a public Use Case, and your Build is listed under it. Your original wording is kept with the record.`,
+      href: `/use-cases/${target.slug}`,
+    };
+  return {
+    ...base,
+    name: "Use Case proposal not approved",
+    body: `Your proposed Use Case “${proposal.suggestedTitle}” was not approved${proposal.reviewNote ? `: ${proposal.reviewNote}` : "."} Your Build keeps its other Use Cases.`,
+    href: `/creator/builds/${proposal.buildId}/edit`,
+  };
 }
 
 const now = () => new Date().toISOString();

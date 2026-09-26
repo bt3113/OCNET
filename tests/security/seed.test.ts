@@ -1,9 +1,9 @@
 // @vitest-environment node
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { PGlite } from "@electric-sql/pglite";
-import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+import type { PGlite } from "@electric-sql/pglite";
 import { seed } from "../../src/data/seed";
+import { migratedDatabase } from "./pglite";
 
 /**
  * The generated catalogue seed (supabase/seed.sql) must apply cleanly on top of every
@@ -11,21 +11,9 @@ import { seed } from "../../src/data/seed";
  * and vendor sources the demo shows — and anonymous visitors see only public rows.
  */
 let db: PGlite;
-const migration = (name: string) => readFileSync(`supabase/migrations/${name}`, "utf8");
 
 beforeAll(async () => {
-  db = new PGlite({ extensions: { pgcrypto } });
-  await db.exec(
-    `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create schema storage;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claims',true)::jsonb->>'sub','')::uuid $$;create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;create function auth.role() returns text language sql stable as $$ select auth.jwt()->>'role' $$;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid,bucket_id text,name text);alter table storage.objects enable row level security;create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;create publication supabase_realtime;`,
-  );
-  for (const name of ["202609230001_marketplace.sql", "202609240001_build_graph.sql"]) await db.exec(migration(name));
-  const search = migration("202609240002_search.sql");
-  await db.exec(search.slice(search.indexOf("create or replace view"), search.indexOf("-- Server-only")));
-  for (const name of ["202609250001_implementation_intelligence.sql", "202609250002_intelligence_search.sql", "202609250003_intelligence_hardening.sql", "202609260001_marketplace_taxonomy.sql"])
-    await db.exec(migration(name));
-  await db.exec(`grant usage on schema public,auth,storage to anon,authenticated,service_role;
-     grant select,insert,update,delete on all tables in schema public to anon,authenticated,service_role;
-     reset role; select set_config('request.jwt.claims','{}',false);`);
+  ({ db } = await migratedDatabase());
   // Applied as the database administrator, exactly as docs/deployment.md describes.
   await db.exec(readFileSync("supabase/seed.sql", "utf8"));
 }, 60000);
