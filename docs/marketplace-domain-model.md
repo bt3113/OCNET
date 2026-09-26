@@ -18,7 +18,7 @@ Category → Subcategory → Use Case → Builds → Build detail
 | **Category** | A broad area of work (Finance, Customer Service). Browsable, never selectable on a Build. | `use_case_categories` (`level = category`) | A technology category (`categories`, used by the technology catalogue) |
 | **Subcategory** | A group of related work inside a category (Accounts Receivable). | `use_case_categories` (`level = subcategory`, `parentId`) | — |
 | **Use Case** | One concrete piece of work, phrased as what gets done (“Chase overdue invoices”). Shared infrastructure: nobody owns it. | `use_cases` + `status`, `originType`, `categoryId`, `subcategoryId` | A Build, or a vendor's marketing page |
-| **Use Case Source** | Who first described the Use Case, with their wording, URL, retrieval date and verification status. | `use_case_sources` | Ownership |
+| **Use Case Source** | Who described the Use Case, with their wording, URL, retrieval/check date and source status. | `use_case_sources` | Ownership or independent evidence |
 | **Use Case Alias** | Other names: `preferred`, `alternate` (shown), `hidden-search` (searchable, never shown), `original-source` (a provider's or vendor's wording). | `use_case_aliases` | — |
 | **Use Case Proposal** | A Solution Provider's suggestion for a missing Use Case, submitted from the Build publisher. Private until moderated. | `use_case_proposals` | A Use Case |
 | **Build** | The primary supply object: a complete solution a Solution Provider designed or can deliver, for 1–3 Use Cases (first = primary). | `builds` (`useCaseIds`, `useCaseProposalId`, `blueprintId`) | Evidence that it works |
@@ -40,7 +40,7 @@ Builds, Implementation Records and Blueprints already reference `creator_profile
 - A Build has **at most one** pending proposal (`use_case_proposals` unique partial index on `buildId where status = 'pending'`).
 - A Build is **indexed** (discovery, counts, sitemap) only when it is public, approved, and at least one of its Use Cases is approved (`isIndexableBuild`). A Build that relies only on a proposal stays out until the proposal is approved or mapped.
 - **Vendor statements are Use Cases with a source, not Builds.** They never count as supply.
-- Counts are **facts**: Builds, Technologies (with the basis for each), Implementations, Solution Providers. “No Builds yet” describes missing supply. Oracnet does not measure demand and never implies it.
+- Counts are **facts**: Builds, Technologies (with the basis for each), Implementations, Solution Providers. “No Builds yet” describes missing supply. Oracnet does not infer buyer demand from supply counts.
 - Build maturity is shown as a fact, not a score: *Build only*, *Build + Blueprint*, *Build + deployment evidence* (`buildMaturity`).
 - Nothing merges automatically. Moderators map, approve (optionally editing), reject, merge, add labels or archive; each action writes an audit event.
 
@@ -51,20 +51,31 @@ Builds, Implementation Records and Blueprints already reference `creator_profile
 | Level | Provenance | Shown as |
 | --- | --- | --- |
 | Illustrative demo | `demo` | Sample profiles, Builds and deployments; the global demo strip says none describes a real customer |
-| Third-party sourced | `third-party sourced` | Vendor statements such as xAI's, with the source link, retrieval date and “Wording to be verified” until checked |
+| Third-party sourced | `third-party sourced` | Vendor statements with source links and retrieval/check dates. A source may be `needs-verification` or `active`; neither state means the vendor has claimed or endorsed the profile. |
 | Community supplied | `creator supplied`, `community supplied`, … | Real submissions in connected mode, after moderation |
 
 Editorial taxonomy rows (categories, placements and aliases written by Oracnet) use provenance `inferred`.
 
-## xAI migration
+## xAI migration and source verification
 
-The previous release modelled xAI's use-case page as eleven Builds. That overstated supply: a vendor saying its model *can* be used for something is not a solution anyone built. They are now eleven Use Cases (`originType: technology-vendor-sourced`, `originEntityId: xai`) with:
+The previous release modelled xAI's use-case page as eleven Builds. That overstated supply: a vendor saying its model *can* be used for something is not a solution anyone built. PR #6 moved those entries to vendor-sourced Use Cases (`originType: technology-vendor-sourced`, `originEntityId: xai`) and preserved the old Build URLs as redirects.
 
-- one `use_case_sources` row each: the captured statement as `originalDescription`, `sourceUrl` `https://x.ai/grok/use-cases`, retrieved and last checked 2026-09-26, capture method, status `needs-verification`, and the Grok products named for it;
-- the former Build titles kept as `alternate` aliases;
-- redirects: `/builds/xai-*` → the matching Use Case; broad areas (`software-development`, `marketing-content`, `visual-content-generation`) → a category or subcategory, because an area is not a piece of work.
+The first capture used search-index copies because the live page was unavailable from the build environment. A post-release check on 2026-09-26 successfully reached the official xAI use-case index and all linked detail pages. The catalogue now contains **15** live vendor-stated Use Cases with:
 
-The live x.ai page could not be fetched from the build environment. Titles are Oracnet-normalised; the captured statements should be checked against the live page before `status` changes to `active`.
+- the vendor's current live title as the public Use Case title and `UseCaseSource.originalTitle`;
+- a short vendor statement captured from the official index;
+- a direct official detail-page `sourceUrl` for every Use Case;
+- retrieved and last-checked dates of 2026-09-26;
+- capture method recording that the live index and linked detail page were checked;
+- source status `active`;
+- the Grok products named for the workflow where applicable;
+- earlier Oracnet-normalised titles retained as `alternate` aliases;
+- redirects from the eleven historical `/builds/xai-*` URLs;
+- broad retired areas (`software-development`, `marketing-content`, `visual-content-generation`) redirected to a category/subcategory because an area is not a piece of work.
+
+Four live vendor entries were missing from the earlier search-index capture and were added during the source check: the three Research & Analysis use cases and the separate image-editing use case.
+
+**Important:** `active` means Oracnet checked the cited source. The xAI profile is still unclaimed, so it must not be presented as reviewed, approved or endorsed by xAI.
 
 ## Research ideas adopted
 
@@ -79,4 +90,4 @@ The live x.ai page could not be fetched from the build environment. Titles are O
 
 Not adopted: machine-generated Use Case suggestions (suggestions are deterministic word matching only), automatic merging of near-duplicates, and popularity or demand scores.
 
-See also [use-case-taxonomy.md](use-case-taxonomy.md) and [supply-model.md](supply-model.md).
+See also [use-case-taxonomy.md](use-case-taxonomy.md), [supply-model.md](supply-model.md), [provider-listings.md](provider-listings.md) and [release-handover.md](release-handover.md).
