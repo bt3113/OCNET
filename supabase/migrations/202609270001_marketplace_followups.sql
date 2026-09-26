@@ -94,3 +94,34 @@ create constraint trigger check_build_has_use_case after insert or update on pub
   deferrable initially deferred for each row execute function public.check_build_has_use_case();
 create constraint trigger check_build_keeps_use_case after delete on public.build_use_cases
   deferrable initially deferred for each row execute function public.check_build_has_use_case();
+
+-- ───────────── Restore an archived Use Case; audit label changes ─────────────
+create or replace function public.restore_use_case(target text) returns void
+language plpgsql security definer set search_path='' as $$
+begin
+  if not public.is_admin() then raise exception 'Moderation requires administrator'; end if;
+  update public.use_cases set data = data || jsonb_build_object('status','approved','updatedAt',now()), published = true
+   where id = target and status = 'archived';
+  if not found then raise exception 'Only an archived Use Case can be restored'; end if;
+  insert into public.audit_events(id,name,provenance,"actorId","entityId","entityType",action,at)
+  values(gen_random_uuid()::text,'Use Case restored','verified',auth.uid(),target,'use_cases','restored',now());
+end $$;
+revoke execute on function public.restore_use_case(text) from public, anon;
+grant execute on function public.restore_use_case(text) to authenticated;
+
+-- Labels are edited directly by administrators (RLS aliases_admin); record every change.
+create or replace function public.audit_use_case_alias() returns trigger
+language plpgsql security definer set search_path='' as $$
+declare row_id text; use_case text; detail text;
+begin
+  if tg_op = 'DELETE' then row_id := old.id; use_case := old."useCaseId"; detail := 'removed label ' || old.label;
+  elsif tg_op = 'UPDATE' then row_id := new.id; use_case := new."useCaseId"; detail := 'label ' || old.label || ' → ' || new.label || ' (' || new."aliasType" || ')';
+  else row_id := new.id; use_case := new."useCaseId"; detail := 'added label ' || new.label || ' (' || new."aliasType" || ')';
+  end if;
+  insert into public.audit_events(id,name,provenance,"actorId","entityId","entityType",action,at)
+  values(gen_random_uuid()::text,'Use Case label changed','verified',auth.uid(),use_case,'use_case_aliases',left(detail, 500),now());
+  return null;
+end $$;
+revoke execute on function public.audit_use_case_alias() from public, anon, authenticated;
+create trigger audit_use_case_alias after insert or update or delete on public.use_case_aliases
+  for each row execute function public.audit_use_case_alias();

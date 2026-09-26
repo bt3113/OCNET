@@ -3,7 +3,7 @@ import type { UseCase } from "./model";
 import type { UseCaseAlias, UseCaseProposal, UseCaseSource } from "./marketplace-model";
 import { approveProposal, mapProposal, mergeUseCases, proposalNotification, rejectProposal, type ModerationResult } from "./use-case-domain";
 import { auditEvent } from "./review";
-import { isSupabase, list, save } from "./repository";
+import { isSupabase, list, remove, save } from "./repository";
 import { normalizeLabel } from "./use-case-text";
 
 /**
@@ -97,4 +97,28 @@ export async function archiveUseCase(useCase: UseCase, reviewerId: string) {
   if (isSupabase) return void (await rpc("archive_use_case", { target: useCase.id }));
   await save("use_cases", { ...useCase, status: "archived", updatedAt: new Date().toISOString() });
   if (!isSupabase) await save("audit_events", auditEvent(reviewerId, "use-case", useCase.id, "use-case-archived", new Date()));
+}
+
+/** Correct a label's text or type. The id stays, so search keeps one row per label. */
+export async function updateAlias(alias: UseCaseAlias, label: string, aliasType: UseCaseAlias["aliasType"], reviewerId: string) {
+  const trimmed = label.trim();
+  if (trimmed.length < 3) throw new Error("Labels need at least 3 characters.");
+  const updated: UseCaseAlias = { ...alias, name: trimmed, label: trimmed, aliasType, normalizedLabel: normalizeLabel(trimmed) };
+  await save("use_case_aliases", updated);
+  if (!isSupabase) await save("audit_events", auditEvent(reviewerId, "use-case", alias.useCaseId, "use-case-alias-updated", new Date(), `${alias.label} → ${trimmed}`));
+  return updated;
+}
+
+/** Remove a label. Connected mode records the change through the alias audit trigger. */
+export async function removeAlias(alias: UseCaseAlias, reviewerId: string) {
+  await remove("use_case_aliases", alias.id);
+  if (!isSupabase) await save("audit_events", auditEvent(reviewerId, "use-case", alias.useCaseId, "use-case-alias-removed", new Date(), alias.label));
+}
+
+/** Bring an archived Use Case back into discovery and the publisher. Merged ones stay merged. */
+export async function restoreUseCase(useCase: UseCase, reviewerId: string) {
+  if (useCase.status !== "archived") throw new Error("Only an archived Use Case can be restored.");
+  if (isSupabase) return void (await rpc("restore_use_case", { target: useCase.id }));
+  await save("use_cases", { ...useCase, status: "approved", updatedAt: new Date().toISOString() });
+  await save("audit_events", auditEvent(reviewerId, "use-case", useCase.id, "use-case-restored", new Date()));
 }

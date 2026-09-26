@@ -101,3 +101,27 @@ describe("Build indexing is checked at commit", () => {
     expect(await t.rows(`select 1 from public.build_use_cases where "buildId"='idx1'`)).toHaveLength(1);
   });
 });
+
+describe("moderation: restore and label audit", () => {
+  it("restores only archived Use Cases, and only for administrators", async () => {
+    await asAdmin();
+    await t.db.exec(`select public.archive_use_case('chase')`);
+    await t.as(owner);
+    await expect(t.db.exec(`select public.restore_use_case('chase')`)).rejects.toThrow(/administrator/);
+    await asAdmin();
+    await t.db.exec(`select public.restore_use_case('chase')`);
+    expect((await t.rows<{ p: boolean; s: string }>(`select published p, status s from public.use_cases where id='chase'`))[0]).toEqual({ p: true, s: "approved" });
+    await expect(t.db.exec(`select public.restore_use_case('chase')`)).rejects.toThrow(/archived/);
+    expect((await t.rows(`select 1 from public.audit_events where "entityId"='chase' and action='restored'`)).length).toBe(1);
+  });
+  it("records every label change in the audit log", async () => {
+    await asAdmin();
+    await t.db.exec(`insert into public.use_case_aliases(id,name,"useCaseId",label,"aliasType","normalizedLabel") values('al-x','dunning','chase','dunning','hidden-search','dunning')`);
+    await t.db.exec(`update public.use_case_aliases set label='dunning letters', "normalizedLabel"='dunning letters' where id='al-x'`);
+    await t.db.exec(`delete from public.use_case_aliases where id='al-x'`);
+    const actions = (await t.rows<{ a: string }>(`select action a from public.audit_events where "entityType"='use_case_aliases' order by at, action`)).map((row) => row.a);
+    expect(actions).toEqual(expect.arrayContaining(["added label dunning (hidden-search)", "label dunning → dunning letters (hidden-search)", "removed label dunning letters"]));
+    await t.as(owner);
+    await expect(t.db.exec(`insert into public.use_case_aliases(id,name,"useCaseId",label,"aliasType","normalizedLabel") values('al-y','x','chase','xx','alternate','xx')`)).rejects.toThrow();
+  });
+});

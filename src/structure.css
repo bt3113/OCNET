@@ -327,3 +327,6 @@
   .supply-gap-table td.name,.supply-gap-table td.action{flex-basis:100%}
   .supply-gap-table td.num::before{content:attr(data-label) " ";color:#655a57}
 }
+.moderation-labels{list-style:none;padding:0;margin:0;display:grid;gap:6px;font-size:13.5px}
+.moderation-labels>li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line)}
+.moderation-labels form label{flex:1 1 180px}

@@ -9,7 +9,7 @@ import { EmptyMarketplaceState, TaxonomyBreadcrumb, plural } from "../components
 import { useMarketplace, type MarketplaceState } from "../data/marketplace-hooks";
 import { approvedUseCases, getUseCaseStats, suggestUseCases, taxonomyPath } from "../data/use-case-domain";
 import { tidyTitle } from "../data/use-case-text";
-import { addAlias, archiveUseCase, moderateApprove, moderateMap, moderateMerge, moderateReject } from "../data/use-case-moderation";
+import { addAlias, archiveUseCase, moderateApprove, moderateMap, moderateMerge, moderateReject, removeAlias, restoreUseCase, updateAlias } from "../data/use-case-moderation";
 import { isSupabase } from "../data/repository";
 import { useUI } from "../state";
 
@@ -388,11 +388,9 @@ function LabelsPanel({ market }: { market: MarketplaceState }) {
           <TaxonomyBreadcrumb useCase={useCase} categories={market.categories} />
           <h3 className="tab-section-title">Labels</h3>
           {aliases.length ? (
-            <ul className="moderation-history">
+            <ul className="moderation-labels">
               {aliases.map((alias) => (
-                <li key={alias.id}>
-                  {alias.label} <span className="muted">· {alias.aliasType}</span>
-                </li>
+                <AliasRow key={alias.id} alias={alias} onChanged={refresh} />
               ))}
             </ul>
           ) : (
@@ -448,6 +446,94 @@ function LabelsPanel({ market }: { market: MarketplaceState }) {
           </button>
         </>
       )}
+      <ArchivedList market={market} onChanged={refresh} />
     </section>
+  );
+}
+
+function AliasRow({ alias, onChanged }: { alias: UseCaseAlias; onChanged: () => Promise<void> }) {
+  const { userId, notify } = useUI();
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(alias.label);
+  const [type, setType] = useState(alias.aliasType);
+  const run = async (action: () => Promise<unknown>, message: string) => {
+    try {
+      await action();
+      notify(message);
+      setEditing(false);
+      await onChanged();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not change the label.");
+    }
+  };
+  if (editing)
+    return (
+      <li>
+        <form className="row wrap" onSubmit={(event) => { event.preventDefault(); void run(() => updateAlias(alias, label, type, userId), "Label updated"); }}>
+          <label>
+            Label text
+            <input value={label} onChange={(event) => setLabel(event.target.value)} minLength={3} maxLength={120} required />
+          </label>
+          <label>
+            Label type
+            <select value={type} onChange={(event) => setType(event.target.value as UseCaseAlias["aliasType"])}>
+              <option value="alternate">Alternate (shown)</option>
+              <option value="hidden-search">Hidden search term</option>
+              <option value="original-source">Original wording (hidden)</option>
+            </select>
+          </label>
+          <button type="submit" className="button dark compact">Save label</button>
+          <button type="button" className="button light compact" onClick={() => setEditing(false)}>Cancel</button>
+        </form>
+      </li>
+    );
+  return (
+    <li>
+      <span>
+        {alias.label} <span className="muted">· {alias.aliasType}</span>
+      </span>
+      <span className="row">
+        <button type="button" className="button light compact" onClick={() => setEditing(true)} aria-label={`Edit label ${alias.label}`}>Edit</button>
+        <button type="button" className="button light compact" onClick={() => void run(() => removeAlias(alias, userId), "Label removed")} aria-label={`Remove label ${alias.label}`}>Remove</button>
+      </span>
+    </li>
+  );
+}
+
+function ArchivedList({ market, onChanged }: { market: MarketplaceState; onChanged: () => Promise<void> }) {
+  const { userId, notify } = useUI();
+  const archived = market.useCases.filter((useCase) => useCase.status === "archived").sort((a, b) => a.name.localeCompare(b.name));
+  return (
+    <>
+      <h3 className="tab-section-title">Archived Use Cases</h3>
+      {archived.length ? (
+        <ul className="moderation-labels">
+          {archived.map((useCase) => (
+            <li key={useCase.id}>
+              <span>
+                {useCase.name} <span className="muted">· {taxonomyPath(useCase, market.categories) || "Not categorised"}</span>
+              </span>
+              <button
+                type="button"
+                className="button light compact"
+                onClick={async () => {
+                  try {
+                    await restoreUseCase(useCase, userId);
+                    notify(`Restored “${useCase.name}”.`);
+                    await onChanged();
+                  } catch (error) {
+                    notify(error instanceof Error ? error.message : "Could not restore.");
+                  }
+                }}
+              >
+                Restore
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">None archived.</p>
+      )}
+    </>
   );
 }
