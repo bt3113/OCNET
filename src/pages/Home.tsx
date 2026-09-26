@@ -1,28 +1,24 @@
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
+  Cpu,
   GitBranch,
-  Plus,
+  LayoutGrid,
   Search,
   ShieldCheck,
-  Sparkles,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
 import { useRecords, useUI } from "../state";
 import { isPublicBuild } from "../data/build-domain";
-import { BuildCard } from "../components/builds/cards";
 import {
-  Badge,
   ButtonLink,
   ErrorState,
   SectionTitle,
   Skeleton,
-  TechnologyCard,
-  UseCaseCard,
 } from "../components/ui";
 import {
   BlueprintCard,
-  EvidencePrincipleNotice,
   ImplementationCard,
 } from "../components/intelligence";
 
@@ -45,7 +41,6 @@ export default function Home() {
   const { data: products = [] } = useRecords("products");
   const { data: cases = [] } = useRecords("use_cases");
   const { data: integrators = [] } = useRecords("integrators");
-  const { data: updates = [] } = useRecords("updates");
   const { data: allSaved = [] } = useRecords("saved_items");
   const saves = allSaved.filter((saved) => !saved.ownerId || saved.ownerId === userId);
   const [q, setQ] = useState("");
@@ -71,8 +66,7 @@ export default function Home() {
       )
       .map((item) => item.productId),
   );
-  const usedProducts = products.filter((product) => usedProductIds.has(product.id));
-  const visibleBuilds = builds.filter(isPublicBuild).slice(0, 3);
+  const visibleBuilds = builds.filter(isPublicBuild).length;
   if (isLoading) return <Skeleton />;
   if (isError) return <ErrorState retry={() => void refetch()} />;
 
@@ -80,7 +74,6 @@ export default function Home() {
     <>
       <div className="home-intro intelligence-home-intro">
         <div>
-          <span className="eyebrow">OUTCOME → EVIDENCE → ARCHITECTURE → PROCUREMENT</span>
           <h1>What are you trying to improve?</h1>
           <p>
             See how comparable businesses implemented it, understand the
@@ -88,10 +81,6 @@ export default function Home() {
             similar.
           </p>
         </div>
-        <ButtonLink to="/implementation/new" variant="light">
-          <Plus size={17} />
-          Document an implementation
-        </ButtonLink>
       </div>
       <form
         className="intent-search intelligence-intent-search"
@@ -117,7 +106,7 @@ export default function Home() {
         </button>
       </form>
       <div className="intent-chips">
-        <span>Start with an outcome</span>
+        <span>Try</span>
         {[
           "Automate missed enquiries",
           "Qualify leads before sales",
@@ -133,17 +122,35 @@ export default function Home() {
         ))}
       </div>
 
-      <EvidencePrincipleNotice />
+      <ol className="how-steps" aria-label="How Oracnet works">
+        <li>
+          <span>1</span>
+          <div>
+            <strong>Describe the outcome</strong>
+            <p>Turn a goal into requirements you can check: budget, systems you keep, constraints.</p>
+          </div>
+        </li>
+        <li>
+          <span>2</span>
+          <div>
+            <strong>See what comparable businesses did</strong>
+            <p>Context, architecture, cost and observed results — with evidence on each claim.</p>
+          </div>
+        </li>
+        <li>
+          <span>3</span>
+          <div>
+            <strong>Reuse or hire</strong>
+            <p>Start from a reusable Blueprint or request a proposal from an implementer.</p>
+          </div>
+        </li>
+      </ol>
 
       <SectionTitle
-        title="Implementation records"
+        title="Recent implementation records"
         to="/implementations"
-        label="Explore implementation intelligence"
+        label="View all records"
       />
-      <p className="section-note">
-        Current homepage records are synthetic demonstrations. The product model
-        is designed for claim-level provenance and real evidence later.
-      </p>
       <div className="implementation-grid home-implementation-grid">
         {publicImplementations.slice(0, 3).map((implementation) => (
           <ImplementationCard
@@ -160,54 +167,10 @@ export default function Home() {
         ))}
       </div>
 
-      <div className="home-intelligence-band">
-        <div className="card home-compare-callout">
-          <GitBranch size={27} />
-          <span className="eyebrow">COMPARE APPROACHES</span>
-          <h2>The same outcome can have several architectures.</h2>
-          <p>
-            Compare business context, baseline, cost, evidence, maintenance and
-            observed outcomes without declaring one universal winner.
-          </p>
-          <Link
-            to={
-              publicImplementations.length >= 2
-                ? `/compare/implementations?ids=${publicImplementations
-                    .slice(0, 3)
-                    .map((item) => item.id)
-                    .join(",")}`
-                : "/implementations"
-            }
-          >
-            Compare implementation approaches <ArrowRight size={16} />
-          </Link>
-        </div>
-        <div className="card home-compiler-callout">
-          <Sparkles size={27} />
-          <span className="eyebrow">SOLUTION COMPILER</span>
-          <h2>Make your constraints explicit.</h2>
-          <p>
-            Oracnet V1 uses deterministic context matching and constraint
-            evaluation—not a hidden chatbot—to surface feasible reference
-            directions and trade-offs.
-          </p>
-          <Link to="/solution-compiler">
-            Build a requirement profile <ArrowRight size={16} />
-          </Link>
-        </div>
-      </div>
-
-      <SectionTitle title="Explore by use case" to="/use-cases" />
-      <div className="usecase-grid">
-        {cases.slice(0, 6).map((useCase) => (
-          <UseCaseCard key={useCase.id} item={useCase} />
-        ))}
-      </div>
-
       <SectionTitle
         title="Reusable Blueprints"
         to="/blueprints"
-        label="Explore sanitized reference architectures"
+        label="View all Blueprints"
       />
       <div className="grid three">
         {publishedBlueprints.slice(0, 3).map((blueprint) => (
@@ -225,60 +188,19 @@ export default function Home() {
         ))}
       </div>
 
-      <SectionTitle
-        title="Technologies seen in implementation records"
-        to="/technologies"
-      />
-      <div className="grid three home-tech-grid">
-        {usedProducts.slice(0, 6).map((product) => (
-          <TechnologyCard key={product.id} product={product} />
-        ))}
-      </div>
-
-      <SectionTitle
-        title="Implementation partners"
-        to="/implementers"
-        label="Explore implementers"
-      />
-      <div className="grid three">
-        {integrators.slice(0, 3).map((partner) => {
-          const count = publicImplementations.filter((implementation) =>
-            implementation.implementerIds.includes(partner.id),
-          ).length;
-          return (
-            <Link
-              className="card home-implementer-card"
-              key={partner.id}
-              to={`/integrators/${partner.slug}`}
-            >
-              <span className={"logo-tile " + partner.color}>
-                {partner.initials}
-              </span>
-              <div>
-                <strong>{partner.name}</strong>
-                <p>{partner.description}</p>
-                <span>
-                  {count} linked demo implementation record{count === 1 ? "" : "s"}
-                </span>
-              </div>
-              <ArrowRight size={17} />
-            </Link>
-          );
-        })}
-      </div>
-
-      <SectionTitle
-        title="Community Builds"
-        to="/builds"
-        label="Explore project showcases"
-      />
-      <p className="section-note">
-        Builds remain a creator/project layer. A Build is not automatically a
-        verified deployment record.
-      </p>
-      <div className="build-grid">
-        {visibleBuilds.map((build) => (
-          <BuildCard key={build.id} build={build} />
+      <SectionTitle title="Browse the catalogue" />
+      <div className="browse-tiles">
+        {[
+          { to: "/use-cases", Icon: GitBranch, title: "Use cases", text: `${cases.length} outcomes with example stacks` },
+          { to: "/technologies", Icon: Cpu, title: "Technologies", text: `${usedProductIds.size} seen in implementation records` },
+          { to: "/implementers", Icon: Users, title: "Implementers", text: `${integrators.length} delivery partners` },
+          { to: "/builds", Icon: LayoutGrid, title: "Builds", text: `${visibleBuilds} creator project showcases` },
+        ].map(({ to, Icon, title, text }) => (
+          <Link key={to} className="card browse-tile" to={to}>
+            <Icon size={20} aria-hidden />
+            <strong>{title}</strong>
+            <span>{text}</span>
+          </Link>
         ))}
       </div>
 
@@ -297,30 +219,14 @@ export default function Home() {
         </div>
       )}
 
-      <SectionTitle title="Evidence & implementation resources" to="/resources" />
-      <div className="grid three">
-        {updates.slice(0, 3).map((update) => (
-          <Link
-            className="card ecosystem-note"
-            key={update.id}
-            to={"/updates/" + update.slug}
-          >
-            <Badge>{update.category} · SAMPLE</Badge>
-            <h3>{update.name}</h3>
-            <p>{update.description}</p>
-            <ArrowRight size={18} />
-          </Link>
-        ))}
-      </div>
-
       <div className="build-footer-banner intelligence-footer-banner">
         <div>
           <ShieldCheck size={25} />
           <span className="eyebrow">IMPLEMENTED SOMETHING REAL?</span>
-          <h2>Document the context, architecture and evidence.</h2>
+          <h2>Document what you deployed.</h2>
           <p>
-            Keep customer-specific IP private. Publish only what you have rights
-            to disclose, and derive a separate reusable Blueprint when appropriate.
+            Customer names stay private. Publish only what you have the right to
+            share.
           </p>
         </div>
         <ButtonLink to="/implementation/new">

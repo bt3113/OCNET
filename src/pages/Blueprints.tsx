@@ -2,8 +2,8 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Download, FileKey2, GitBranch, LockKeyhole, ShieldAlert, ShieldCheck, Wrench } from "lucide-react";
 import { PageHeading } from "../components/layout";
-import { Badge, Breadcrumbs, EmptyState, ErrorState, Skeleton } from "../components/ui";
-import { BlueprintCard, IllustrativeNotice, ImplementationCard, RightsBadge, SectionIntro, StalenessBadge } from "../components/intelligence";
+import { Badge, Breadcrumbs, EmptyState, ErrorState, Skeleton, TabbedSections } from "../components/ui";
+import { BlueprintCard, ImplementationCard, RightsBadge, StalenessBadge } from "../components/intelligence";
 import { useActions, useUI } from "../state";
 import { isPublicRecord, useIntelligence } from "../data/intelligence-hooks";
 import { blueprintFreshness, implementationFreshness } from "../data/staleness";
@@ -96,6 +96,14 @@ function BlueprintDetail({ slug }: { slug: string }) {
   const { userId, notify } = useUI();
   const data = useIntelligence();
   const [versionId, setVersionId] = useState("");
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") ?? "architecture";
+  const selectTab = (id: string) => {
+    const next = new URLSearchParams(params);
+    if (id === "architecture") next.delete("tab");
+    else next.set("tab", id);
+    setParams(next, { replace: true });
+  };
   const blueprint = data.blueprints.find((item) => item.slug === slug);
   useEffect(() => {
     if (blueprint?.id) track("blueprint_view", blueprint.id);
@@ -162,38 +170,10 @@ function BlueprintDetail({ slug }: { slug: string }) {
     navigate(`/app/projects/${id}`);
   }
 
-  return (
+  const architecture = (
     <>
-      <Breadcrumbs items={[{ name: "Blueprints", to: "/blueprints" }, { name: blueprint.name }]} />
-      <header className="blueprint-detail-hero">
-        <div>
-          <div className="row wrap">
-            <Badge>{blueprint.demo ? "DEMO BLUEPRINT" : "BLUEPRINT"}</Badge>
-            <RightsBadge rights={blueprint.reuseRights} />
-            <StalenessBadge state={freshness.state} />
-            {blueprint.publicationState !== "published" && <Badge>DRAFT · not public</Badge>}
-          </div>
-          <PageHeading eyebrow="SANITIZED REFERENCE ARCHITECTURE" title={blueprint.name} description={blueprint.description} />
-          <div className="tags">{blueprint.capabilityIds.map((capability) => <span key={capability}>{capabilityLabel(capability)}</span>)}</div>
-          {blueprint.demo && <IllustrativeNotice>Demo Blueprint. Component relationships, estimates and license text are illustrative.</IllustrativeNotice>}
-        </div>
-        <aside className="card blueprint-action-card">
-          <strong>Reuse state</strong>
-          <dl className="detail-list">
-            <div><dt>Rights</dt><dd>{rightsCatalogue[blueprint.reuseRights].label}</dd></div>
-            <div><dt>Reference use</dt><dd>{reference.allowed === true ? "Permitted" : reference.allowed === "conditional" ? "Check terms" : "Not permitted"}</dd></div>
-            <div><dt>Commercial use</dt><dd>{commercial.allowed === true ? "Permitted" : commercial.allowed === "conditional" ? "Check terms" : "Not granted"}</dd></div>
-            <div><dt>Source available</dt><dd>{blueprint.sourceAvailable ? "Yes" : "No"}</dd></div>
-            <div><dt>Maintainer</dt><dd>{blueprint.maintainerId}</dd></div>
-          </dl>
-          <button className="button dark" type="button" onClick={() => void request()}>Request implementation <ArrowRight size={17} aria-hidden /></button>
-          <p className="muted small-print">An implementer delivers it for you. Public visibility is not a license.</p>
-        </aside>
-      </header>
-
       <section className="blueprint-version-bar card" aria-label="Version history">
         <div>
-          <span className="eyebrow">VERSION HISTORY</span>
           <strong>{isCurrent ? "Viewing the current version." : "Viewing a historical version — not the current recommendation."}</strong>
           <small className="muted">{version?.changeNotes}</small>
         </div>
@@ -206,9 +186,9 @@ function BlueprintDetail({ slug }: { slug: string }) {
           </select>
         </label>
       </section>
-
-      <section className="intelligence-section">
-        <SectionIntro eyebrow="REFERENCE ARCHITECTURE" title={`Capability slots in v${version?.version}`}>Dashed slots can take the recorded alternatives. Swapping a component requires re-checking compatibility — the Solution Compiler does this for you.</SectionIntro>
+      <section className="intelligence-section" aria-labelledby="bp-architecture-heading">
+        <h2 id="bp-architecture-heading" className="tab-section-title">Capability slots in v{version?.version}</h2>
+        <p className="tab-section-note">Dashed slots can take the recorded alternatives. Swapping a component means re-checking compatibility — the Solution Compiler does this for you.</p>
         <Suspense fallback={<div className="card skeleton architecture-skeleton" role="status" aria-label="Loading architecture" />}>
           <ArchitectureMap
             key={version?.id}
@@ -221,74 +201,85 @@ function BlueprintDetail({ slug }: { slug: string }) {
           />
         </Suspense>
       </section>
-
-      <div className="blueprint-detail-columns">
-        <section>
-          <SectionIntro eyebrow="REQUIREMENTS" title="What you still need to provide" />
-          <div className="blueprint-requirements">
-            {data.requirements.filter((item) => item.blueprintId === blueprint.id).map((requirement) => (
-              <div className="card" key={requirement.id}>
-                <CheckCircle2 size={19} aria-hidden />
-                <div><strong>{requirement.name}</strong><p>{requirement.description}</p><span>{requirement.type} · {requirement.required ? "required" : "optional"}</span></div>
-              </div>
-            ))}
+      <section className="intelligence-section" aria-labelledby="bp-manifest-heading">
+        <h2 id="bp-manifest-heading" className="tab-section-title">Download the manifest</h2>
+        <p className="tab-section-note">Machine-readable description of this version. Third-party SaaS components are listed as services; their licences are NOASSERTION.</p>
+        {manifest && (
+          <div className="row wrap">
+            <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}-manifest.json`, manifest)}><Download size={15} aria-hidden /> Oracnet manifest</button>
+            <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}.cdx.json`, toCycloneDx(manifest))}><Download size={15} aria-hidden /> CycloneDX 1.7</button>
+            <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}.spdx.json`, toSpdx(manifest))}><Download size={15} aria-hidden /> SPDX 2.3</button>
           </div>
-          <div className="card blueprint-limitations">
-            <ShieldAlert size={22} aria-hidden />
-            <div>
-              <h3>Known limitations</h3>
-              <p>{blueprint.knownLimitations}</p>
-              {blueprint.setupNotes && <p><strong>Setup notes:</strong> {blueprint.setupNotes}</p>}
-              <p><strong>Skills:</strong> {blueprint.requiredSkills.join(", ")} · <strong>Complexity:</strong> {blueprint.estimatedComplexity}</p>
+        )}
+      </section>
+    </>
+  );
+
+  const setup = (
+    <>
+      <section className="intelligence-section" aria-labelledby="bp-requirements-heading">
+        <h2 id="bp-requirements-heading" className="tab-section-title">What you still need to provide</h2>
+        <div className="blueprint-requirements">
+          {data.requirements.filter((item) => item.blueprintId === blueprint.id).map((requirement) => (
+            <div className="card" key={requirement.id}>
+              <CheckCircle2 size={19} aria-hidden />
+              <div><strong>{requirement.name}</strong><p>{requirement.description}</p><span>{requirement.type} · {requirement.required ? "required" : "optional"}</span></div>
             </div>
+          ))}
+        </div>
+      </section>
+      <section className="intelligence-section" aria-labelledby="bp-limits-heading">
+        <h2 id="bp-limits-heading" className="tab-section-title">Limitations and effort</h2>
+        <div className="card blueprint-limitations">
+          <ShieldAlert size={22} aria-hidden />
+          <div>
+            <p>{blueprint.knownLimitations}</p>
+            {blueprint.setupNotes && <p><strong>Setup notes:</strong> {blueprint.setupNotes}</p>}
+            <p><strong>Skills:</strong> {blueprint.requiredSkills.join(", ")} · <strong>Complexity:</strong> {blueprint.estimatedComplexity}</p>
           </div>
-          <div className="card manifest-card">
-            <h3>Machine-readable manifest</h3>
-            <p className="muted">Oracnet’s canonical model, exported to open standards for tooling. Third-party SaaS components are listed as services; their licenses are NOASSERTION.</p>
-            {manifest && (
-              <div className="row wrap">
-                <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}-manifest.json`, manifest)}><Download size={15} aria-hidden /> Oracnet manifest</button>
-                <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}.cdx.json`, toCycloneDx(manifest))}><Download size={15} aria-hidden /> CycloneDX 1.7</button>
-                <button type="button" className="button light" onClick={() => downloadJson(`${blueprint.slug}-v${version?.version}.spdx.json`, toSpdx(manifest))}><Download size={15} aria-hidden /> SPDX 2.3</button>
-              </div>
-            )}
-          </div>
-        </section>
-        <aside>
-          <div className="card blueprint-license-card">
-            <FileKey2 size={22} aria-hidden />
-            <h3>Rights & license</h3>
-            <RightsBadge rights={blueprint.reuseRights} />
-            <p>{rightsCatalogue[blueprint.reuseRights].description}</p>
-            <p className="muted">{license?.licenseText ?? blueprint.license}</p>
-            <dl className="detail-list">
-              <div><dt>Attribution</dt><dd>{license?.attributionRequired ? "Required" : "Not specified"}</dd></div>
-              <div><dt>Rights declared</dt><dd>{blueprint.rightsDeclaredAt ?? "Not declared"}</dd></div>
-            </dl>
-          </div>
-          <div className="card">
-            <ShieldCheck size={22} aria-hidden />
-            <h3>Sanitization</h3>
-            {blueprint.sanitizationConfirmedAt ? (
-              <p>Publisher confirmed all {sanitizationChecklist.length} checklist items on {blueprint.sanitizationConfirmedAt}. Automated scanning assists but does not guarantee removal.</p>
-            ) : (
-              <p>Sanitization has not been confirmed — this Blueprint cannot be published.</p>
-            )}
-            {!gate.ready && <ul className="gate-list">{gate.missing.map((item) => <li key={item}>{item}</li>)}</ul>}
-          </div>
-          <div className="card blueprint-maintenance-card">
-            <Wrench size={22} aria-hidden />
-            <h3>Compatibility freshness</h3>
-            <StalenessBadge state={freshness.state} />
-            <ul className="freshness-reasons">{freshness.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
-            {version?.compatibilityNotes && <p className="muted">{version.compatibilityNotes}</p>}
-          </div>
-        </aside>
-      </div>
+        </div>
+      </section>
+    </>
+  );
 
+  const trust = (
+    <div className="grid three blueprint-trust-grid">
+      <div className="card blueprint-license-card">
+        <FileKey2 size={22} aria-hidden />
+        <h3>Rights & licence</h3>
+        <RightsBadge rights={blueprint.reuseRights} />
+        <p>{rightsCatalogue[blueprint.reuseRights].description}</p>
+        <p className="muted">{license?.licenseText ?? blueprint.license}</p>
+        <dl className="detail-list">
+          <div><dt>Attribution</dt><dd>{license?.attributionRequired ? "Required" : "Not specified"}</dd></div>
+          <div><dt>Rights declared</dt><dd>{blueprint.rightsDeclaredAt ?? "Not declared"}</dd></div>
+        </dl>
+      </div>
+      <div className="card">
+        <ShieldCheck size={22} aria-hidden />
+        <h3>Sanitization</h3>
+        {blueprint.sanitizationConfirmedAt ? (
+          <p>Publisher confirmed all {sanitizationChecklist.length} checklist items on {blueprint.sanitizationConfirmedAt}. Automated scanning assists but does not guarantee removal.</p>
+        ) : (
+          <p>Sanitization has not been confirmed.</p>
+        )}
+      </div>
+      <div className="card blueprint-maintenance-card">
+        <Wrench size={22} aria-hidden />
+        <h3>Compatibility freshness</h3>
+        <StalenessBadge state={freshness.state} />
+        <ul className="freshness-reasons">{freshness.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+        {version?.compatibilityNotes && <p className="muted">{version.compatibilityNotes}</p>}
+      </div>
+    </div>
+  );
+
+  const evidence = (
+    <>
+      <p className="tab-section-note intelligence-section">A Blueprint does not inherit a record’s evidence. These records are listed so you can inspect them yourself.</p>
       {source && (
-        <section className="intelligence-section">
-          <SectionIntro eyebrow="DERIVED FROM" title="The implementation record stays separate">This Blueprint points back to the record that inspired it without copying customer-specific data.</SectionIntro>
+        <section className="intelligence-section" aria-labelledby="bp-source-heading">
+          <h2 id="bp-source-heading" className="tab-section-title">Derived from</h2>
           <div className="grid two">
             <ImplementationCard
               implementation={source}
@@ -301,8 +292,8 @@ function BlueprintDetail({ slug }: { slug: string }) {
         </section>
       )}
       {!!usedBy.length && (
-        <section className="intelligence-section">
-          <SectionIntro eyebrow="SIMILAR RECORDED STACKS" title="Other records using most of these components" />
+        <section className="intelligence-section" aria-labelledby="bp-used-heading">
+          <h2 id="bp-used-heading" className="tab-section-title">Other records using most of these components</h2>
           <div className="grid two">
             {usedBy.map((record) => (
               <ImplementationCard key={record.id} implementation={record} context={data.contexts.find((context) => context.implementationId === record.id)} metrics={data.metrics.filter((metric) => metric.implementationId === record.id)} metricDefinitions={data.definitions} freshness={implementationFreshness(record, now).state} />
@@ -310,6 +301,59 @@ function BlueprintDetail({ slug }: { slug: string }) {
           </div>
         </section>
       )}
+      {!source && !usedBy.length && <p className="muted">No published implementation records use this pattern yet.</p>}
+    </>
+  );
+
+  return (
+    <>
+      <Breadcrumbs items={[{ name: "Blueprints", to: "/blueprints" }, { name: blueprint.name }]} />
+      <header className="blueprint-detail-hero">
+        <div>
+          <PageHeading eyebrow="REUSABLE BLUEPRINT" title={blueprint.name} description={blueprint.description} />
+          <div className="row wrap implementation-badges">
+            {blueprint.demo && <span className="evidence-badge evidence-demo">Illustrative</span>}
+            <RightsBadge rights={blueprint.reuseRights} />
+            <StalenessBadge state={freshness.state} />
+            {blueprint.publicationState !== "published" && <Badge>DRAFT · not public</Badge>}
+          </div>
+          <dl className="implementation-header-facts">
+            <div><dt>Current version</dt><dd>v{versions.find((item) => item.id === blueprint.currentVersionId)?.version ?? "—"}</dd></div>
+            <div><dt>Complexity</dt><dd>{blueprint.estimatedComplexity}</dd></div>
+            <div><dt>Components</dt><dd>{items.length}</dd></div>
+            <div><dt>Capabilities</dt><dd>{blueprint.capabilityIds.map(capabilityLabel).join(", ")}</dd></div>
+          </dl>
+          {!gate.ready && (
+            <div className="notice gate-notice" role="note">
+              <strong>This Blueprint cannot be published yet.</strong>
+              <ul className="gate-list">{gate.missing.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+          )}
+        </div>
+        <aside className="card blueprint-action-card">
+          <strong>Can I use this?</strong>
+          <dl className="detail-list">
+            <div><dt>Reference use</dt><dd>{reference.allowed === true ? "Permitted" : reference.allowed === "conditional" ? "Check terms" : "Not permitted"}</dd></div>
+            <div><dt>Commercial use</dt><dd>{commercial.allowed === true ? "Permitted" : commercial.allowed === "conditional" ? "Check terms" : "Not granted"}</dd></div>
+            <div><dt>Source available</dt><dd>{blueprint.sourceAvailable ? "Yes" : "No"}</dd></div>
+          </dl>
+          <button className="button dark" type="button" onClick={() => void request()}>Request implementation <ArrowRight size={17} aria-hidden /></button>
+          <Link className="button light" to="/solution-compiler">Check it against my requirements</Link>
+          <p className="muted small-print">An implementer delivers it for you. Public visibility is not a licence.</p>
+        </aside>
+      </header>
+
+      <TabbedSections
+        label="Blueprint sections"
+        active={tab}
+        onChange={selectTab}
+        tabs={[
+          { id: "architecture", label: "Architecture", count: items.length, content: architecture },
+          { id: "setup", label: "Setup", content: setup },
+          { id: "rights", label: "Rights & trust", content: trust },
+          { id: "evidence", label: "Related records", count: (source ? 1 : 0) + usedBy.length, content: evidence },
+        ]}
+      />
     </>
   );
 }

@@ -40,7 +40,14 @@ test("comparison labels undisclosed and incomparable values explicitly", async (
 test("implementation detail exposes metric provenance, claim evidence and an accessible architecture", async ({ page }) => {
   await page.goto(`${base}/implementations/property-enquiry-automation`);
   await expect(page.locator("main h1")).toContainText("Multi-location property maintenance");
-  await expect(page.getByRole("note").first()).toContainText("ILLUSTRATIVE RECORD");
+  // Demo status is stated once for the whole app and again on the record's evidence badge.
+  await expect(page.locator(".demo-strip")).toContainText("illustrative");
+  await expect(page.locator("main .evidence-badge").first()).toContainText("Demo / illustrative");
+  await expect(page.locator("main")).not.toContainText(/caused|resulted in|thanks to/i);
+  // Details are grouped into tabs; the active tab is kept in the URL.
+  const tabs = page.getByRole("tablist", { name: "Implementation record sections" });
+  await tabs.getByRole("tab", { name: /Results & cost/ }).click();
+  await expect(page).toHaveURL(/tab=results/);
   await expect(page.locator("main")).not.toContainText(/caused|resulted in|thanks to/i);
   await page.locator(".metric-card").filter({ hasText: "Median first-response time" }).getByRole("button", { name: /Provenance/ }).click();
   const drawer = page.getByRole("dialog");
@@ -48,9 +55,18 @@ test("implementation detail exposes metric provenance, claim evidence and an acc
   await expect(drawer).toContainText("Evidence method");
   await expect(drawer).toContainText("not a forecast");
   await page.keyboard.press("Escape");
+  await tabs.getByRole("tab", { name: /Evidence/ }).click();
   await page.getByRole("button", { name: "Evidence for Booking rate" }).click();
   await expect(page.getByRole("dialog")).toContainText("needs more evidence");
   await page.keyboard.press("Escape");
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export W3C PROV-JSON" }).click()]);
+  expect(download.suggestedFilename()).toBe("property-enquiry-automation-prov.json");
+  // Arrow keys move between tabs (WAI-ARIA tabs pattern).
+  await tabs.getByRole("tab", { name: /Evidence/ }).focus();
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await expect(tabs.getByRole("tab", { name: /Architecture/ })).toHaveAttribute("aria-selected", "true");
+  await expect(tabs.getByRole("tab", { name: /Architecture/ })).toBeFocused();
   const map = page.locator(".architecture-map");
   await expect(map).toBeVisible();
   await map.getByRole("button", { name: /CRM: HubSpot CRM/ }).focus();
@@ -60,8 +76,6 @@ test("implementation detail exposes metric provenance, claim evidence and an acc
   await expect(map.locator(".architecture-inspector-panel")).toContainText("Connector available");
   await map.getByRole("button", { name: "List view" }).click();
   await expect(map.locator(".architecture-list")).toContainText("Connections");
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export W3C PROV-JSON" }).click()]);
-  expect(download.suggestedFilename()).toBe("property-enquiry-automation-prov.json");
 });
 
 test("request something similar creates a private procurement project", async ({ page }) => {
@@ -246,16 +260,19 @@ test("mobile: filters open in a bottom sheet and core flows fit 360px", async ({
     await expect(page.locator("main h1")).toBeVisible();
     expect(await noOverflow(page)).toBe(true);
   }
-  await page.goto(`${base}/implementations/property-enquiry-automation`);
+  await page.goto(`${base}/implementations/property-enquiry-automation?tab=architecture`);
   await expect(page.locator(".architecture-list")).toBeVisible();
 });
 
 for (const path of [
   "/implementations",
   "/implementations/property-enquiry-automation",
+  "/implementations/property-enquiry-automation?tab=evidence",
+  "/implementations/property-enquiry-automation?tab=next",
   "/compare/implementations?ids=property-enquiry-automation,salon-booking-followup",
   "/blueprints",
   "/blueprints/inquiry-booking-reference",
+  "/blueprints/inquiry-booking-reference?tab=rights",
   "/solution-compiler",
   "/use-cases/enquiry-to-booking",
   "/technologies/hubspot",

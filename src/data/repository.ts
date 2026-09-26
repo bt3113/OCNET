@@ -16,7 +16,7 @@ export interface Repository {
 }
 const key = "oracnet:v1:";
 /** Intelligence tables use their own namespace so seed revisions do not mix with older browser data. */
-const intelligenceKey = "oracnet:intel-v2:";
+const intelligenceKey = "oracnet:intel-v3:";
 const storageKey = (table: Table) => (table in intelligenceSeed ? intelligenceKey : key) + table;
 export class DemoRepository implements Repository {
   private read<K extends Table>(table: K): Tables[K][] {

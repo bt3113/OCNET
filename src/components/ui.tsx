@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -674,5 +674,69 @@ export function CheckLine({ children }: { children: ReactNode }) {
       <Check size={17} />
       {children}
     </p>
+  );
+}
+
+/** Accessible tabs (WAI-ARIA tabs pattern) whose active tab lives in the URL. */
+export function TabbedSections({
+  tabs,
+  active,
+  onChange,
+  label,
+}: {
+  tabs: { id: string; label: string; count?: number; content: ReactNode }[];
+  active: string;
+  onChange: (id: string) => void;
+  label: string;
+}) {
+  const refs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const current = tabs.find((tab) => tab.id === active) ?? tabs[0];
+  // Navigate from the focused tab, not from render state, so rapid key presses stay in step.
+  const move = (from: string, offset: number) => {
+    const index = (tabs.findIndex((tab) => tab.id === from) + offset + tabs.length) % tabs.length;
+    onChange(tabs[index].id);
+    refs.current[tabs[index].id]?.focus();
+  };
+  return (
+    <div className="tabbed">
+      <div
+        className="tab-list"
+        role="tablist"
+        aria-label={label}
+        onKeyDown={(event) => {
+          const from = (event.target as HTMLElement).id.replace(/^tab-/, "");
+          const position = tabs.findIndex((tab) => tab.id === from);
+          if (position < 0) return;
+          if (event.key === "ArrowRight") move(from, 1);
+          else if (event.key === "ArrowLeft") move(from, -1);
+          else if (event.key === "Home") move(from, -position);
+          else if (event.key === "End") move(from, tabs.length - 1 - position);
+          else return;
+          event.preventDefault();
+        }}
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            ref={(node) => {
+              refs.current[tab.id] = node;
+            }}
+            type="button"
+            role="tab"
+            id={`tab-${tab.id}`}
+            aria-selected={tab.id === current.id}
+            aria-controls={`panel-${tab.id}`}
+            tabIndex={tab.id === current.id ? 0 : -1}
+            onClick={() => onChange(tab.id)}
+          >
+            {tab.label}
+            {tab.count != null && <span className="tab-count">{tab.count}</span>}
+          </button>
+        ))}
+      </div>
+      <div className="tab-panel" role="tabpanel" id={`panel-${current.id}`} aria-labelledby={`tab-${current.id}`} tabIndex={0}>
+        {current.content}
+      </div>
+    </div>
   );
 }

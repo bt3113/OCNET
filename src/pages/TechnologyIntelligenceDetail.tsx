@@ -282,8 +282,8 @@ export default function TechnologyIntelligenceDetail() {
                     <strong>{other ? <Link to={`/technologies/${other.slug}`}>{other.name}</Link> : otherId}</strong>
                     <div className="row wrap">
                       <RelationshipTypeBadge type={relationship.relationshipType} />
-                      <EvidenceBadge level={relationship.evidenceLevel} compact />
-                      <StalenessBadge state={relationshipFreshness(relationship, now).state} />
+                      {relationship.evidenceLevel !== "demo" && <EvidenceBadge level={relationship.evidenceLevel} compact />}
+                      {relationshipFreshness(relationship, now).state !== "current" && <StalenessBadge state={relationshipFreshness(relationship, now).state} />}
                     </div>
                     <small>Source: {relationship.sourceLabel}</small>
                     {!!relationship.conditions?.length && <small>Conditions: {relationship.conditions.join(" ")}</small>}
@@ -299,7 +299,7 @@ export default function TechnologyIntelligenceDetail() {
             <section className="intelligence-section">
               <SectionIntro eyebrow="CO-OCCURRING IN RECORDS" title="Components recorded alongside it">Co-occurrence counts published records containing both products. It says nothing about compatibility.</SectionIntro>
               <div className="stack-table card">
-                {coOccurring.map(([id, count]) => {
+                {coOccurring.slice(0, 5).map(([id, count]) => {
                   const other = products.find((item) => item.id === id);
                   return (
                     <div key={id} className="stack-row">
@@ -311,6 +311,7 @@ export default function TechnologyIntelligenceDetail() {
                   );
                 })}
               </div>
+              {coOccurring.length > 5 && <p className="muted small-print">+ {coOccurring.length - 5} more components recorded alongside it.</p>}
             </section>
           )}
 

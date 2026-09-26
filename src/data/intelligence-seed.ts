@@ -177,7 +177,7 @@ const rows: Row[] = [
   {
     id: "property-enquiry-automation",
     name: "Multi-location property maintenance enquiry automation",
-    summary: "Illustrative record: phone and web enquiries for a four-branch maintenance business are captured, qualified and booked, with staff handling exceptions.",
+    summary: "Phone and web enquiries for a four-branch maintenance business are captured, qualified and booked, with staff handling exceptions.",
     problem: "Enquiries arrived by phone and web form across four branches. Calls went unanswered at peak times, and staff re-keyed details into the CRM before calling customers back to book.",
     businessType: "Property maintenance services",
     size: "11–50 employees",
@@ -205,7 +205,7 @@ const rows: Row[] = [
   {
     id: "salon-booking-followup",
     name: "Two-salon enquiry, booking and follow-up workflow",
-    summary: "Illustrative record: website and message enquiries receive an immediate acknowledgement, structured questions and a booking link, with staff approving non-standard requests.",
+    summary: "Website and message enquiries receive an immediate acknowledgement, structured questions and a booking link, with staff approving non-standard requests.",
     problem: "Staff answered booking messages between clients, so replies were slow and reminders were inconsistent.",
     businessType: "Salon and beauty services",
     size: "1–10 employees",
@@ -232,7 +232,7 @@ const rows: Row[] = [
   {
     id: "agency-lead-routing",
     name: "Agency lead qualification and routing",
-    summary: "Illustrative record: inbound project enquiries are structured and routed to the right person in the CRM before a human sales conversation.",
+    summary: "Inbound project enquiries are structured and routed to the right person in the CRM before a human sales conversation.",
     problem: "Project enquiries were copied manually from forms and inboxes into the CRM, and good leads waited days for a reply.",
     businessType: "Creative agency",
     size: "11–50 employees",
@@ -259,7 +259,7 @@ const rows: Row[] = [
   {
     id: "hospitality-reservation-assist",
     name: "Multi-site after-hours reservation assistance",
-    summary: "Illustrative record: after-hours calls to three venues are answered by a voice interface that captures structured reservation requests for staff to confirm.",
+    summary: "After-hours calls to three venues are answered by a voice interface that captures structured reservation requests for staff to confirm.",
     problem: "Calls outside opening hours went to voicemail and many were never returned; the reservations team spent mornings working through callbacks.",
     businessType: "Hospitality group",
     size: "51–200 employees",
@@ -287,7 +287,7 @@ const rows: Row[] = [
   {
     id: "trades-missed-call-textback",
     name: "Plumbing & heating missed-call text-back",
-    summary: "Illustrative record: missed calls to a single-site trades business trigger an SMS with a short qualification form and booking link.",
+    summary: "Missed calls to a single-site trades business trigger an SMS with a short qualification form and booking link.",
     problem: "Engineers could not answer calls on jobs, and missed callers usually rang the next firm on the list.",
     businessType: "Plumbing and heating trades",
     size: "1–10 employees",

@@ -5,14 +5,11 @@ import {
   CheckCircle2,
   CircleHelp,
   Clock3,
-  DatabaseZap,
   Eye,
   FileKey2,
   GitBranch,
-  Layers3,
   LockKeyhole,
   ShieldCheck,
-  Sparkles,
   TriangleAlert,
   UserRound,
   Workflow,
@@ -44,8 +41,7 @@ import { rightsCatalogue } from "../data/rights";
 import { computeFreshness, freshnessPolicies, implementationFreshness, stalenessLabels } from "../data/staleness";
 import { similaritySummary } from "../data/context-similarity";
 import type { TimelineEvent } from "../data/provenance";
-import { capabilityLabel } from "../data/taxonomy";
-import { Badge, Drawer, SaveButton } from "./ui";
+import { Drawer, SaveButton } from "./ui";
 
 export function EvidenceBadge({ level, compact = false, demo = false }: { level: EvidenceLevel; compact?: boolean; demo?: boolean }) {
   const icon =
@@ -54,7 +50,7 @@ export function EvidenceBadge({ level, compact = false, demo = false }: { level:
   return (
     <span className={`evidence-badge evidence-${level} ${demo && level !== "demo" ? "evidence-on-demo" : ""}`}>
       {icon}
-      {compact ? label.replace(" / illustrative", "") : label}
+      {compact ? (level === "demo" ? "Illustrative" : label.replace(" / illustrative", "")) : label}
       {demo && level !== "demo" ? " · demo" : ""}
     </span>
   );
@@ -138,14 +134,13 @@ export function ImplementationCard({
     .filter((metric): metric is ImplementationMetric => !!metric)
     .slice(0, 2);
   const definition = (id: string) => metricDefinitions.find((item) => item.id === id);
+  const state = freshness ?? implementationFreshness(implementation, new Date()).state;
   return (
     <article className="card implementation-card">
       <div className="implementation-card-top">
-        <div className="row wrap">
-          <Badge>{implementation.demo ? "ILLUSTRATIVE RECORD" : "IMPLEMENTATION"}</Badge>
-          <EvidenceBadge level={implementation.verificationState} compact />
-          <StalenessBadge state={freshness ?? implementationFreshness(implementation, new Date()).state} />
-        </div>
+        <span className="card-eyebrow">
+          {[implementation.businessType, context?.locations ? `${context.locations} location${context.locations === 1 ? "" : "s"}` : null, implementation.region].filter(Boolean).join(" · ")}
+        </span>
         <div className="row implementation-card-actions">
           {compare && (
             <label className="compare-check">
@@ -160,12 +155,7 @@ export function ImplementationCard({
         <h3>{implementation.name}</h3>
         <ArrowRight size={17} aria-hidden />
       </Link>
-      <p>{implementation.summary}</p>
-      <dl className="implementation-context-strip">
-        <div><dt>Business</dt><dd>{implementation.businessType}</dd></div>
-        <div><dt>Locations</dt><dd>{context?.locations ?? "Not disclosed"}</dd></div>
-        <div><dt>Volume / month</dt><dd>{context?.monthlyVolumeMin != null ? `${context.monthlyVolumeMin.toLocaleString("en-GB")}–${(context.monthlyVolumeMax ?? context.monthlyVolumeMin).toLocaleString("en-GB")}` : "Not disclosed"}</dd></div>
-      </dl>
+      <p className="card-summary">{implementation.summary}</p>
       {!!highlights.length && (
         <div className="implementation-outcomes-inline">
           {highlights.map((metric) => (
@@ -174,7 +164,6 @@ export function ImplementationCard({
               <strong>
                 {formatMetricValue(metric.baselineValue, metric.unit)} → {formatMetricValue(metric.observedValue, metric.unit)}
               </strong>
-              <span>baseline → observed{implementation.demo ? " · illustrative" : ""}</span>
             </div>
           ))}
         </div>
@@ -186,7 +175,10 @@ export function ImplementationCard({
         </div>
       )}
       <div className="card-foot implementation-card-foot">
-        <span>{implementation.implementationDuration} · {implementation.region}</span>
+        <span className="row">
+          <EvidenceBadge level={implementation.verificationState} compact />
+          {state !== "current" && <StalenessBadge state={state} />}
+        </span>
         <strong>{costLabel(implementation)}</strong>
       </div>
     </article>
@@ -474,31 +466,28 @@ export function BlueprintCard({
   products?: Product[];
   freshness?: StalenessState;
 }) {
+  const state = freshness ?? computeFreshness({ lastReviewedAt: version?.lastValidatedAt ?? blueprint.lastValidatedAt, archived: blueprint.compatibilityState === "archived" }, new Date(), freshnessPolicies.blueprintCompatibility).state;
+  const names = stackItems.map((item) => products.find((candidate) => candidate.id === item.productId)?.name ?? item.role);
+  const stackText = names.length > 4 ? `${names.slice(0, 4).join(", ")} +${names.length - 4} more` : names.join(", ");
   return (
     <article className="card blueprint-card">
-      <div className="row between">
-        <span className="category-icon sand"><Layers3 size={22} aria-hidden /></span>
-        <div className="row wrap">
-          <Badge>{blueprint.demo ? "DEMO BLUEPRINT" : "BLUEPRINT"}</Badge>
-          <StalenessBadge state={freshness ?? computeFreshness({ lastReviewedAt: version?.lastValidatedAt ?? blueprint.lastValidatedAt, archived: blueprint.compatibilityState === "archived" }, new Date(), freshnessPolicies.blueprintCompatibility).state} />
-        </div>
+      <div className="row between blueprint-card-top">
+        <span className="card-eyebrow">Version {version?.version ?? "—"} · {blueprint.estimatedComplexity} complexity</span>
+        {blueprint.demo && <span className="evidence-badge evidence-demo"><TriangleAlert size={13} aria-hidden />Illustrative</span>}
       </div>
       <Link to={`/blueprints/${blueprint.slug}`} className="blueprint-card-title">
         <h3>{blueprint.name}</h3>
         <ArrowRight size={16} aria-hidden />
       </Link>
-      <p>{blueprint.description}</p>
-      <div className="blueprint-stack-mini" aria-label="Capability slots">
-        {stackItems.map((item) => {
-          const product = products.find((candidate) => candidate.id === item.productId);
-          return <span key={item.id} title={capabilityLabel(item.capabilityId)}>{product?.name ?? item.role}{item.alternativeProductIds.length ? ` +${item.alternativeProductIds.length}` : ""}</span>;
-        })}
+      <p className="card-summary">{blueprint.description}</p>
+      <p className="blueprint-stack-line">
+        <span className="sr-only">Components: </span>
+        {stackText}
+      </p>
+      <div className="card-foot blueprint-card-foot">
+        <RightsBadge rights={blueprint.reuseRights} />
+        {state !== "current" && <StalenessBadge state={state} />}
       </div>
-      <dl className="blueprint-meta">
-        <div><dt>Version</dt><dd>{version?.version ?? "—"}</dd></div>
-        <div><dt>Complexity</dt><dd>{blueprint.estimatedComplexity}</dd></div>
-        <div><dt>Reuse</dt><dd><RightsBadge rights={blueprint.reuseRights} /></dd></div>
-      </dl>
     </article>
   );
 }
@@ -520,27 +509,7 @@ export function ProvenanceTimeline({ events }: { events: TimelineEvent[] }) {
   );
 }
 
-export function EvidencePrincipleNotice() {
-  return (
-    <div className="evidence-principle notice">
-      <DatabaseZap size={21} aria-hidden />
-      <div>
-        <strong>Implementation intelligence, not performance promises.</strong>
-        <p>Oracnet records context, provenance and observed values. A result in one business is not a forecast or causal claim for another.</p>
-      </div>
-    </div>
-  );
-}
 
-export function CompilerEmptyState() {
-  return (
-    <div className="compiler-empty card">
-      <span className="category-icon sand"><Sparkles size={25} aria-hidden /></span>
-      <h2>Build a requirement profile, not a prompt.</h2>
-      <p>Oracnet turns your description into editable requirement cards. You confirm each value, mark what is a hard requirement, and the engine checks recorded implementations and Blueprints.</p>
-    </div>
-  );
-}
 
 export function SectionIntro({ eyebrow, title, children, id }: { eyebrow: string; title: string; children?: ReactNode; id?: string }) {
   return (
