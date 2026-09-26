@@ -11,6 +11,7 @@ import { useActions, useRecords, useUI } from "../state";
 import { isSupabase } from "../data/repository";
 import {
   canReadBuild,
+  isProviderListing,
   isPublicBuild,
   relatedBuilds,
   remixBuild,
@@ -141,7 +142,9 @@ export default function BuildDetail() {
             <Badge>
               {b.provenance === "demo"
                 ? "Illustrative demo build"
-                : b.provenance}
+                : isProviderListing(b)
+                  ? "Provider use-case listing"
+                  : b.provenance}
             </Badge>
             <Badge>
               {b.verification === "verified"
@@ -156,6 +159,18 @@ export default function BuildDetail() {
           </div>
           <h1>{b.name}</h1>
           <p className="build-tagline">{b.tagline}</p>
+          {isProviderListing(b) && (
+            <p className="provider-listing-note" role="note">
+              Listed by {creator?.name ?? "the provider"} and summarised by Oracnet from its public page
+              {b.sources[0] && (
+                <>
+                  {" "}
+                  (<SafeLink url={b.sources[0].url}>source</SafeLink>)
+                </>
+              )}
+              . Not tested by Oracnet; no customer outcome is claimed.
+            </p>
+          )}
           <div className="row wrap">
             <Link className="creator-byline" to={"/creators/" + creator?.slug}>
               <span className={"mini-avatar " + creator?.color}>
@@ -219,7 +234,7 @@ export default function BuildDetail() {
             <>
               <BuildGallery build={b} />
               <div className="card prose">
-                <h2>What this build does</h2>
+                <h2>{isProviderListing(b) ? "What the provider lists" : "What this build does"}</h2>
                 <p>{b.description}</p>
                 <div className="grid two">
                   <div>
@@ -237,7 +252,7 @@ export default function BuildDetail() {
                     </p>
                   </div>
                 </div>
-                <h3>Creator notes</h3>
+                <h3>{isProviderListing(b) ? "Listing notes" : "Creator notes"}</h3>
                 <p>{b.notes || "No additional notes supplied."}</p>
               </div>
               <h2 className="subheading">Inside the stack</h2>
@@ -299,7 +314,9 @@ export default function BuildDetail() {
               <Badge>
                 {b.provenance === "demo"
                   ? "Demo implementation information"
-                  : "Creator-supplied information"}
+                  : isProviderListing(b)
+                    ? "Summarised from provider pages"
+                    : "Creator-supplied information"}
               </Badge>
               <dl className="detail-list">
                 {[
@@ -441,9 +458,15 @@ export default function BuildDetail() {
               your outcome.
             </p>
             <BuildSomething build={b} onRemix={() => void remix()} />
-            <button className="button light" onClick={() => setContact(true)}>
-              Contact creator
-            </button>
+            {isProviderListing(b) ? (
+              <Link className="button light" to={"/providers/" + (creator?.slug ?? "")}>
+                View provider profile
+              </Link>
+            ) : (
+              <button className="button light" onClick={() => setContact(true)}>
+                Contact creator
+              </button>
+            )}
             <BuildCompareButton build={b} />
             <Link className="text-link" to="/compare?type=builds">
               Open build comparison →
@@ -475,7 +498,9 @@ export default function BuildDetail() {
             <p className="muted">
               {b.provenance === "demo"
                 ? "This is an illustrative example, not a verified real-world deployment."
-                : "Implementation claims are supplied by the creator unless evidence says otherwise."}
+                : isProviderListing(b)
+                  ? "The provider lists this use case. It is not a deployment record or an outcome claim."
+                  : "Implementation claims are supplied by the creator unless evidence says otherwise."}
             </p>
             <BuildReport build={b} />
           </div>

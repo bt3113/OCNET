@@ -19,7 +19,10 @@ import {
   consultants,
   articles,
 } from "../src/data/seed.ts";
-import { builds, creators } from "../src/data/build-seed.ts";
+import { builds as demoBuilds, creators as demoCreators } from "../src/data/build-seed.ts";
+import { xaiBuilds, xaiCreator } from "../src/data/vendor-xai.ts";
+const builds = [...demoBuilds, ...xaiBuilds];
+const creators = [...demoCreators, xaiCreator];
 import { implementationRecords, blueprints } from "../src/data/intelligence-seed.ts";
 // Only public, approved records get static pages, metadata and sitemap entries.
 // Private customer identity never appears here: descriptions use the public summary.

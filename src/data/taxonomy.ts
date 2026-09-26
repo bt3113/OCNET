@@ -62,6 +62,14 @@ export const capabilityLabels: Record<string, string> = {
   hosting: "Hosting",
   forms: "Web forms",
   messaging: "Messaging",
+  assistant: "AI assistant",
+  "coding-agent": "Coding agent",
+  "content-generation": "Content generation",
+  "document-extraction": "Document extraction",
+  translation: "Translation",
+  "image-generation": "Image generation",
+  video: "Video generation",
+  website: "Website",
 };
 
 export function capabilityLabel(id: string) {

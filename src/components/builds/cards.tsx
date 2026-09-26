@@ -14,9 +14,22 @@ import {
 import type { Build, CreatorProfile } from "../../data/build-model";
 import { useActions, useRecords, useUI } from "../../state";
 import { Badge, ButtonLink, Logo, Modal, SaveButton } from "../ui";
-import { safeUrl } from "../../data/build-domain";
+import { isProviderListing, safeUrl } from "../../data/build-domain";
 export const assetUrl = (url: string) =>
   url.startsWith("media/") ? import.meta.env.BASE_URL + url : url;
+/** Typographic cover for provider use-case listings, which carry no artwork of their own. */
+export function ProviderListingCover({ build, large = false }: { build: Build; large?: boolean }) {
+  const { data: products = [] } = useRecords("products");
+  const names = build.stack.map((item) => products.find((product) => product.id === item.productId)?.name ?? item.role);
+  return (
+    <div className={`provider-listing-cover${large ? " large" : ""}`}>
+      <span>{build.industry}</span>
+      <strong>{build.name}</strong>
+      <small>{[...new Set(names)].join(" · ")}</small>
+    </div>
+  );
+}
+
 export function BuildCard({
   build,
   variant = "grid",
@@ -33,7 +46,9 @@ export function BuildCard({
   return (
     <article className={`build-card ${variant}`}>
       <Link className="build-cover" to={"/builds/" + build.slug}>
-        {cover ? (
+        {!cover && isProviderListing(build) ? (
+          <ProviderListingCover build={build} />
+        ) : cover ? (
           <BuildImage
             loading="lazy"
             src={assetUrl(cover.url)}
@@ -48,7 +63,9 @@ export function BuildCard({
         <span className="build-cover-label">
           {build.provenance === "demo"
             ? "ILLUSTRATIVE BUILD"
-            : "BUILD SHOWCASE"}
+            : isProviderListing(build)
+              ? "PROVIDER USE CASE"
+              : "BUILD SHOWCASE"}
         </span>
       </Link>
       <div className="build-card-body">
@@ -67,7 +84,7 @@ export function BuildCard({
           <span className={"mini-avatar " + (creator?.color ?? "sand")}>
             {creator?.name.slice(0, 1) ?? "C"}
           </span>
-          Built by {creator?.name ?? "Creator"}
+          {isProviderListing(build) ? "Listed by" : "Built by"} {creator?.name ?? "Creator"}
         </Link>
         <div className="stack-chips">
           {build.stack.slice(0, 4).map((s) => {
