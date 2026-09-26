@@ -8,7 +8,7 @@ GitHub Pages hosts a public demo only: static files, browser-local data, no secr
 | --- | --- |
 | UI | The existing React/Vite SPA (no framework migration) |
 | Hosting | A host with edge rewrites, response headers and edge functions — recommended: Cloudflare Pages + a small Worker, or Vercel/Netlify with edge middleware |
-| Dynamic metadata | Edge function renders title/description/OG/JSON-LD for `/implementations/:slug`, `/blueprints/:slug`, `/builds/:slug`, `/use-cases/:slug`, `/technologies/:slug`, `/implementers/:slug` from the security-invoker `search_documents` view (public rows only), and returns real 404s |
+| Dynamic metadata | Edge function renders title/description/OG/JSON-LD for `/implementations/:slug`, `/blueprints/:slug`, `/builds/:slug`, `/use-cases/:slug`, `/technologies/:slug`, `/solution-providers/:slug`, `/technology-vendors/:slug` from the security-invoker `search_documents` view (public rows only), and returns real 404s |
 | Auth, DB, Storage | Supabase Auth (PKCE), Postgres with RLS (migrations `202609230001`–`202609250004`), private `implementation-evidence` bucket |
 | Privileged operations | Supabase Edge Functions: `attestation`, `evidence`, `import-public`; future `embeddings`, payment webhooks |
 | Background jobs | Scheduled function: expire attestations, purge `attestation_contacts` after 30 days, recompute freshness and fingerprints, embed changed public documents |

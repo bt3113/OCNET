@@ -24,7 +24,7 @@ Same tokens and primitives; no second design system. Additions: evidence, freshn
 
 Patterns follow common solution-library and case-study layouts: summary first, detail on demand.
 
-- **Navigation:** six primary destinations (Home, Find a solution, Implementations, Blueprints, Technologies, Implementers). “Browse more” and “Your workspace” are collapsible groups that open automatically when they contain the current page.
+- **Navigation:** primary destinations Home, Use Cases, Builds, Technologies and Solution Providers, with “Find a solution” as a secondary link; Implementations, Blueprints, Technology Vendors and Resources sit under “Browse more”. “Browse more” and “Your workspace” are collapsible groups that open automatically when they contain the current page.
 - **Demo labelling:** one persistent demo strip at the top of every page, plus a single “Illustrative” status chip per card. Cards no longer repeat several demo badges.
 - **Cards:** context eyebrow (business · locations · region), title, summary, up to two observed results, then a footer with evidence status and cost. Freshness appears only when it is not current.
 - **Detail pages:** hero with key facts and a single action panel, headline results (implementation records), then tabs (`TabbedSections` in `ui.tsx`) following the WAI-ARIA tabs pattern with arrow/Home/End keys. The active tab is stored as `?tab=`; legacy `#request`/`#evidence` anchors map to their tab.
@@ -35,3 +35,7 @@ Patterns follow common solution-library and case-study layouts: summary first, d
 - **Solution Compiler:** a three-step stepper. After compiling, the requirement form collapses into a summary with “Edit requirement”; results lead with the feasible approaches, then trade-offs, exclusions and comparable businesses. The engine’s step log sits under “How this result was computed”.
 
 Styles for these patterns live in `src/structure.css`.
+
+## Marketplace components (`src/components/marketplace.tsx`)
+
+`TaxonomyBreadcrumb`, `EntityCountRow` (factual counts, zero shown muted), `UseCaseSourceBadge`, `SupplyGapIndicator` (“No Builds yet” / “Few Builds available”, never demand), `UseCaseCard`, `MarketplaceMaturity`, `SolutionProviderCard`, `TechnologyVendorCard`, `BuildImplementationList`, `SourceProvenancePanel`, `EmptyMarketplaceState`, `UseCaseSelectionChip`. The publisher's `UseCasePicker` (`src/components/builds/UseCasePicker.tsx`) follows the WAI-ARIA combobox pattern with a listbox popup.

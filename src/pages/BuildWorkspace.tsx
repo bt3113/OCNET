@@ -22,6 +22,7 @@ import {
   Skeleton,
 } from "../components/ui";
 import { BuildCard, SafeLink } from "../components/builds/cards";
+import { SupplyGaps } from "../components/SupplyGaps";
 export default function BuildWorkspace() {
   const [area, section = "overview"] = useLocation()
     .pathname.split("/")
@@ -219,7 +220,7 @@ export default function BuildWorkspace() {
               <DataTable
                 headings={["Creator", "Provenance", "Verification", "Review"]}
                 rows={creators.map((c) => [
-                  <Link to={"/creators/" + c.slug}>{c.name}</Link>,
+                  <Link to={"/solution-providers/" + c.slug}>{c.name}</Link>,
                   c.provenance,
                   c.verification,
                   <button
@@ -577,7 +578,7 @@ export default function BuildWorkspace() {
     <>
       <WorkspaceNotice />
       <PageHeading
-        eyebrow="CREATOR STUDIO"
+        eyebrow="SOLUTION PROVIDER STUDIO"
         title={
           section === "overview"
             ? `Make your work useful, ${userName.split(" ")[0]}.`
@@ -595,7 +596,7 @@ export default function BuildWorkspace() {
         action={
           <ButtonLink to="/creator/builds/new">
             <Plus size={17} />
-            Publish a build
+            Publish a Build
           </ButtonLink>
         }
       />
@@ -652,7 +653,7 @@ export default function BuildWorkspace() {
                 Edit profile
               </ButtonLink>
               {creator && (
-                <Link className="text-link" to={"/creators/" + creator.slug}>
+                <Link className="text-link" to={"/solution-providers/" + creator.slug}>
                   View public profile →
                 </Link>
               )}
@@ -660,6 +661,7 @@ export default function BuildWorkspace() {
           </div>
           <h2 className="subheading">Continue your work</h2>
           {buildRows()}
+          <SupplyGaps creatorId={creator?.id} />
         </>
       ) : section === "builds" ? (
         buildRows()

@@ -4,18 +4,19 @@ import { products, providers, useCases, stacks, seed } from "../src/data/seed";
 import { projectSchema } from "../src/components/forms";
 import {
   XAI_USE_CASES_URL,
-  xaiBuilds,
-  xaiCreator,
   xaiProducts,
   xaiProvider,
   xaiRelatedStacks,
-  xaiRelatedUseCases,
+  xaiUseCaseAliases,
+  xaiUseCaseSources,
+  xaiUseCases,
 } from "../src/data/vendor-xai";
 describe("catalogue integrity", () => {
   it("every product and stack resolves its relationships", () => {
     for (const p of products)
       expect(providers.some((v) => v.id === p.providerId)).toBe(true);
-    for (const u of useCases)
+    // Editorial solution patterns are optional; a Use Case may exist before anyone maps one.
+    for (const u of useCases.filter((u) => u.stackId))
       expect(stacks.some((s) => s.id === u.stackId)).toBe(true);
     for (const s of stacks)
       for (const i of s.items) {
@@ -24,31 +25,34 @@ describe("catalogue integrity", () => {
           expect(products.some((p) => p.id === id)).toBe(true);
       }
   });
-  // Seed rows are demo data unless they come from a vendor module that cites its
-  // public sources (currently xAI). Sourced rows must link to where they came from;
-  // nothing else may leave the demo label.
-  it("labels seed records as demo unless they cite a public source", () => {
+  // Seed rows are demo data unless they are either (a) sourced from a vendor's public
+  // pages (currently xAI) with links back to the source, or (b) Oracnet's own editorial
+  // taxonomy (categories, Use Case labels, solution patterns), marked "inferred".
+  it("labels seed records as demo unless they are sourced or editorial taxonomy", () => {
     const sourcedIds = new Set<string>([
       xaiProvider.id,
-      xaiCreator.id,
       ...xaiProducts.map((row) => row.id),
-      ...xaiBuilds.map((row) => row.id),
-      ...xaiRelatedUseCases.map((row) => row.id),
-      ...xaiRelatedStacks.map((row) => row.id),
+      ...xaiUseCases.map((row) => row.id),
+      ...xaiUseCaseSources.map((row) => row.id),
+      ...xaiUseCaseAliases.map((row) => row.id),
     ]);
-    for (const rows of Object.values(seed))
+    const editorialTables = new Set(["use_case_categories", "use_cases", "use_case_sources", "use_case_aliases", "use_case_redirects", "solution_stacks"]);
+    for (const [table, rows] of Object.entries(seed))
       for (const row of rows as { id: string; provenance: string }[]) {
         if (row.provenance === "demo") continue;
-        expect(sourcedIds.has(row.id), `${row.id} is not demo data and has no declared source`).toBe(true);
-        expect(["third-party sourced", "inferred"]).toContain(row.provenance);
+        if (row.provenance === "third-party sourced") expect(sourcedIds.has(row.id), `${row.id} claims a source it does not declare`).toBe(true);
+        else {
+          expect(row.provenance, `${table}/${row.id}`).toBe("inferred");
+          expect(editorialTables.has(table), `${table}/${row.id} is not editorial taxonomy`).toBe(true);
+        }
       }
+    for (const stack of xaiRelatedStacks) expect(stack.provenance).toBe("inferred");
     expect(xaiProvider.listing?.sources.every((source) => source.url.startsWith("https://"))).toBe(true);
     for (const product of xaiProducts) expect(product.sourceUrl).toMatch(/^https:\/\//);
-    for (const build of xaiBuilds) {
-      expect(build.sources.some((source) => source.evidence === "third-party sourced" && source.url === XAI_USE_CASES_URL)).toBe(true);
-      expect(build.cloneAllowed || build.commercialUseAllowed).toBe(false);
-      expect(`${build.buildCost}${build.buildTime}`).toBe("");
-      expect(build.description).not.toMatch(/caused|resulted in|increased|reduced .* by/i);
+    for (const source of xaiUseCaseSources) {
+      expect(source.sourceUrl).toBe(XAI_USE_CASES_URL);
+      expect(source.captureMethod).toMatch(/verify/);
+      expect(source.originalDescription).not.toMatch(/caused|resulted in/i);
     }
   });
   it("validates project requirements", () => {

@@ -5,10 +5,10 @@ import {
   intelligenceProviders,
   intelligenceSeed,
   intelligenceStacks,
-  intelligenceUseCases,
 } from "./intelligence-seed";
 import { seed } from "./seed";
-import { xaiBuilds, xaiCreator, xaiProducts, xaiProvider, xaiRelatedStacks, xaiRelatedUseCases } from "./vendor-xai";
+import { xaiProducts, xaiProvider, xaiRelatedStacks } from "./vendor-xai";
+import { marketplaceBuilds, marketplaceCreators, marketplaceOffers } from "./marketplace-seed";
 export interface Repository {
   list<K extends Table>(table: K): Promise<Tables[K][]>;
   save<K extends Table>(table: K, value: Tables[K]): Promise<Tables[K]>;
@@ -17,8 +17,15 @@ export interface Repository {
 }
 const key = "oracnet:v1:";
 /** Intelligence tables use their own namespace so seed revisions do not mix with older browser data. */
-const intelligenceKey = "oracnet:intel-v3:";
-const storageKey = (table: Table) => (table in intelligenceSeed ? intelligenceKey : key) + table;
+const intelligenceKey = "oracnet:intel-v4:";
+/** The work taxonomy moved Use Cases under Category → Subcategory; older stored copies are not reused. */
+const taxonomyKey = "oracnet:taxonomy-v1:";
+const taxonomyTables = new Set<Table>(["use_cases", "use_case_categories", "use_case_sources", "use_case_aliases", "use_case_proposals", "use_case_redirects"]);
+const storageKey = (table: Table) => (taxonomyTables.has(table) ? taxonomyKey : table in intelligenceSeed ? intelligenceKey : key) + table;
+/** Earlier releases stored xAI's vendor statements as Builds and a creator profile; they are now Use Cases. */
+const retiredRecord = (table: Table, row: { id: string; provenance?: string }) =>
+  (table === "builds" && row.id.startsWith("xai-") && row.provenance === "third-party sourced") ||
+  (table === "creator_profiles" && row.id === "xai" && row.provenance === "third-party sourced");
 export class DemoRepository implements Repository {
   private read<K extends Table>(table: K): Tables[K][] {
     const raw = localStorage.getItem(storageKey(table));
@@ -31,14 +38,15 @@ export class DemoRepository implements Repository {
       const additions: Partial<Record<Table, { id: string }[]>> = {
         products: [...buildProducts, ...intelligenceProducts, ...xaiProducts],
         providers: [...buildProviders, ...intelligenceProviders, xaiProvider],
-        use_cases: [...intelligenceUseCases, ...xaiRelatedUseCases],
         solution_stacks: [...intelligenceStacks, ...xaiRelatedStacks],
-        builds: xaiBuilds,
-        creator_profiles: [xaiCreator],
+        builds: marketplaceBuilds,
+        creator_profiles: marketplaceCreators,
+        build_offers: marketplaceOffers,
       };
+      const current = (parsed as { id: string; provenance?: string }[]).filter((row) => !retiredRecord(table, row));
       return [
-        ...parsed,
-        ...(additions[table] ?? []).filter((x) => !parsed.some((v) => v.id === x.id)),
+        ...current,
+        ...(additions[table] ?? []).filter((x) => !current.some((v) => v.id === x.id)),
       ] as Tables[K][];
     } catch {
       throw new Error(

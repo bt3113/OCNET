@@ -66,14 +66,14 @@ Move to a host supporting server-rendered entity metadata, security headers and 
 - [Security / threat model](docs/security.md)
 - [QA evidence and limits](docs/qa.md)
 - [Implementation intelligence](docs/implementation-intelligence.md) · [records](docs/implementation-records.md) · [metrics](docs/metric-model.md) · [verification](docs/verification-model.md) · [provenance](docs/provenance-model.md) · [Blueprints](docs/blueprints.md) · [Solution Compiler](docs/solution-compiler.md)
-- [Provider profiles and use-case listings (xAI / Grok)](docs/provider-listings.md)
+- [Marketplace domain model](docs/marketplace-domain-model.md) · [Use Case taxonomy](docs/use-case-taxonomy.md) · [Supply model](docs/supply-model.md) · [Technology Vendor profiles (xAI / Grok)](docs/provider-listings.md)
 - [Production architecture](docs/production-architecture.md) · [research notes](docs/technical-research-notes.md) · [progress and open gaps](docs/implementation-progress.md)
 
-## Builds and creators
+## Marketplace: Use Cases, Builds and Solution Providers
 
-The marketplace now connects outcomes to creator-published **Builds**: concrete implementation blueprints, technology stacks, architecture diagrams, evidence, reuse permissions and offers. Procurement Projects remain separate. Explore six clearly labelled examples, publish your own browser-local Build, remix permitted blueprints, compare Builds, organize private collections, and contact creators in demo messages. Accounts support multiple roles.
+Oracnet is organised as **Category → Subcategory → Use Case → Builds → Build detail** (Blueprint, stack, real Implementations, services and the Solution Provider). `/use-cases` is the primary surface; `/solution-providers` lists agencies, studios, freelancers, consultancies and systems integrators; `/technology-vendors` lists the companies behind technologies, whose statements appear as sourced Use Cases rather than Builds. Old `/creators`, `/implementers`, `/integrators`, `/consultants` and `/providers` URLs redirect. See [marketplace-domain-model.md](docs/marketplace-domain-model.md).
 
-The nine-step publisher supports public GitHub import, manual entry, original media, use cases, confirmed technologies, architecture, implementation/license details, offers and review. Connected publication enters moderation. Creator, provider and admin workspaces extend the same interface. See [Build marketplace](docs/build-marketplace.md) for routes, permissions, import boundaries and production prerequisites. The relational migration, optional Auth-bound seed, full-text search and PostgreSQL RLS tests accompany the frontend.
+The six-step publisher (Basics, Use Cases, How it works, Proof, Service, Review) asks for one to three Use Cases through an accessible combobox with deterministic suggestions, and allows one moderated proposal for a missing Use Case. Moderators work at `/admin/use-cases`. Procurement Projects remain separate. Public GitHub import and media upload sit inside Basics. Connected publication enters moderation. Creator, provider and admin workspaces extend the same interface. See [Build marketplace](docs/build-marketplace.md) for routes, permissions, import boundaries and production prerequisites. The relational migration, optional Auth-bound seed, full-text search and PostgreSQL RLS tests accompany the frontend.
 
 ## Implementation intelligence
 

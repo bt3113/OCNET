@@ -6,16 +6,13 @@ export const publicRoutes = [
   "/blueprints",
   "/solution-compiler",
   "/builds",
-  "/creators",
   "/collections",
   "/use-cases",
   "/solution-stacks",
   "/technologies",
   "/categories",
-  "/providers",
-  "/implementers",
-  "/integrators",
-  "/consultants",
+  "/solution-providers",
+  "/technology-vendors",
   "/marketplace",
   "/compare",
   "/compare/implementations",
@@ -114,3 +111,6 @@ export const buildAdminRoutes = [
   "/admin/reports",
 ];
 export const buildProviderRoutes = ["/provider/builds", "/provider/claims"];
+
+/** Old public paths kept resolvable by client-side redirects; never listed in the sitemap. */
+export const legacyRoutes = ["/creators", "/providers", "/implementers", "/integrators", "/consultants"];

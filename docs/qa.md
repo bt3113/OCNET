@@ -1,3 +1,46 @@
+# QA record — marketplace refactor (2026-09-26)
+
+Run locally with Node 22, Vitest, PGlite and Playwright (Chromium 1194 via `CHROMIUM_EXECUTABLE_PATH`). CI (Node 24) also passed `validate` on PR #6.
+
+| Check | Result |
+| --- | --- |
+| `npm run lint`, `npm run typecheck` | pass |
+| `npm test` | **150 passed** (11 files), including 18 taxonomy RLS tests and 27 marketplace domain tests |
+| `npm run test:e2e` | **83 passed** |
+| `npm run build` | pass; 233 route entry points; the sitemap lists approved Use Cases, indexable Builds, Solution Providers and Technology Vendors, and excludes pending content and legacy routes |
+
+**E2E matrix.**
+- A: three Use Cases through the combobox; the fourth is refused.
+- B: a proposal stays private, then is mapped.
+- C: a proposal with a typo is approved under an edited title, and the original wording is kept.
+- D: vendor-origin Use Case attribution and legacy xAI redirects.
+- E: a Build joins an xAI-origin Use Case (0 → 1).
+- F: Build detail tabs, maturity and proof.
+- G: Solution Compiler coverage, including the catalogue-only notice.
+- H: overflow checks at 1440/1280/1024/768/430/390/360 px on 18 pages.
+- I: axe (`wcag2a/aa`, `wcag21aa`, `wcag22aa`) on 18 marketplace pages, 3 vendor pages, the publisher with the listbox open, compiler coverage states and the existing intelligence states.
+
+**Independent review.** A review pass found 11 issues, all fixed with tests:
+- proposal provenance and dates could be forged;
+- remix copied the proposal and Blueprint links;
+- merges left sort gaps and broke chains;
+- archive violated a constraint;
+- unlinking a Blueprint was not persisted;
+- the publisher could lose track of a pending proposal;
+- smaller validation, relevance and link issues.
+
+The 6 new RLS tests fail against the earlier migration and pass on the fixed one.
+
+**Fixed during QA.**
+- The supply-gap table overflowed on phones; it is now a stacked layout.
+- Search type buttons were 21 px targets; they are now 32 px.
+- A pre-existing table-header contrast failure (4.37:1) was fixed.
+
+**Not verified.**
+- Connected Supabase mode against a provisioned project; RPCs and RLS were exercised only in PGlite.
+- The live x.ai page; statements are marked "Wording to be verified".
+- A screen-reader pass. Axe results are not a WCAG conformance claim.
+
 # QA record — information architecture pass (2026-09-26)
 
 Restructured the UI for scannability: grouped navigation, one demo strip, compact cards, tabbed detail pages, progressive filters and a stepped compiler (see `docs/design-system.md`). Page heights at 1440 px: home 4,458 → 2,071; implementation detail 8,495 → ~2,100 per tab; use case 5,065 → 1,397; compiler results 4,796 → 3,280.

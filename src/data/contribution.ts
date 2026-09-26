@@ -83,6 +83,8 @@ export interface ContributionDraft {
   blueprintSetupNotes: string;
   sanitizationConfirmed: string[];
   declaration: boolean;
+  /** The Build this deployment used, when the record was started from one. */
+  sourceBuildId?: string;
 }
 
 export const emptyDraft: ContributionDraft = {
@@ -289,6 +291,7 @@ export function buildSubmission(
     creatorIds: [ownerId],
     providerIds: [...new Set(productIds.map((productId) => input.products.find((product) => product.id === productId)?.providerId).filter((value): value is string => !!value))],
     derivedBlueprintIds: [],
+    sourceBuildId: draft.sourceBuildId || undefined,
     lastEvidenceReviewAt: today,
     nextEvidenceReviewAt: new Date(now.getTime() + 180 * 86400000).toISOString().slice(0, 10),
     stalenessState: "unknown",

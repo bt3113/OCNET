@@ -19,8 +19,6 @@ export const slugify = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 90);
-/** A use case listed by a technology provider (compiled from its public pages), not a creator's build. */
-export const isProviderListing = (b: Pick<Build, "provenance">) => b.provenance === "third-party sourced";
 export const isPublicBuild = (b: Build) =>
   b.visibility === "public" &&
   b.publication === "published" &&
@@ -38,7 +36,7 @@ export const buildSchema = z.object({
   description: z.string().trim().min(40).max(12000),
   creatorId: z.string().min(1),
   category: z.string().min(1),
-  useCaseIds: z.array(z.string()).min(1),
+  useCaseIds: z.array(z.string()).max(3), // min 1 incl. a proposal: see buildUseCaseErrors
   stack: z
     .array(
       z.object({
@@ -164,6 +162,9 @@ export function remixBuild(
     category: source.category,
     industry: source.industry,
     useCaseIds: [...source.useCaseIds],
+    // A remix starts without the source's pending proposal or its owner's Blueprint link.
+    useCaseProposalId: null,
+    blueprintId: null,
     capabilityIds: [...source.capabilityIds],
     stack: source.stack.map((s) => ({ ...s, id: ids.get(s.id)! })),
     connections: source.connections.map((c) => ({

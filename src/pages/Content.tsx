@@ -430,8 +430,8 @@ export default function Content() {
               Contact a technology provider from their profile to try the
               enquiry workflow.
             </p>
-            <ButtonLink to="/providers" variant="light">
-              Explore providers
+            <ButtonLink to="/technology-vendors" variant="light">
+              Explore Technology Vendors
               <ArrowRight size={16} />
             </ButtonLink>
           </aside>

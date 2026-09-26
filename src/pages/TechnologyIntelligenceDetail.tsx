@@ -25,7 +25,7 @@ import {
 } from "../components/intelligence";
 import { isPublicRecord } from "../data/intelligence-hooks";
 import { relationshipFreshness } from "../data/staleness";
-import { isProviderListing, isPublicBuild } from "../data/build-domain";
+import { isPublicBuild } from "../data/build-domain";
 import { ProductMediaList } from "../components/media";
 import { useActions, useRecords, useUI } from "../state";
 
@@ -50,6 +50,7 @@ export default function TechnologyIntelligenceDetail() {
   const { data: useCaseLinks = [] } = useRecords("implementation_use_cases");
   const { data: useCases = [] } = useRecords("use_cases");
   const { data: builds = [] } = useRecords("builds");
+  const { data: useCaseSources = [] } = useRecords("use_case_sources");
   if (isLoading) return <Skeleton />;
   const product = products.find((item) => item.slug === slug);
   if (!product)
@@ -96,8 +97,11 @@ export default function TechnologyIntelligenceDetail() {
   );
   const alternatives = products.filter((candidate) => alternativeIds.has(candidate.id));
   const relatedBuilds = builds.filter((build) => isPublicBuild(build) && build.stack.some((item) => item.productId === product.id));
-  const providerListings = relatedBuilds.filter(isProviderListing);
-  const creatorBuilds = relatedBuilds.filter((build) => !isProviderListing(build));
+  const creatorBuilds = relatedBuilds;
+  const vendorUseCases = useCaseSources
+    .filter((source) => source.sourceType === "technology-vendor" && source.productIds.includes(product.id))
+    .map((source) => ({ source, useCase: useCases.find((useCase) => useCase.id === source.useCaseId) }))
+    .filter((item): item is { source: (typeof useCaseSources)[number]; useCase: NonNullable<typeof item.useCase> } => !!item.useCase);
   return (
     <>
       <Breadcrumbs
@@ -121,7 +125,7 @@ export default function TechnologyIntelligenceDetail() {
               <SaveButton id={product.id} name={product.name} />
               <CompareButton product={product} />
               {provider && (
-                <Link to={`/providers/${provider.slug}`}>
+                <Link to={`/technology-vendors/${provider.slug}`}>
                   {provider.name} <ArrowRight size={14} />
                 </Link>
               )}
@@ -340,15 +344,21 @@ export default function TechnologyIntelligenceDetail() {
             </section>
           )}
 
-          {!!providerListings.length && (
+          {!!vendorUseCases.length && (
             <section className="intelligence-section">
-              <SectionIntro eyebrow="PROVIDER USE CASES" title={`What ${provider?.name ?? "the provider"} lists it for`}>The provider’s own use-case descriptions, summarised with a link to the source. They are not deployment evidence.</SectionIntro>
-              <ul className="build-links">{providerListings.map((build) => <li key={build.id}><Link to={`/builds/${build.slug}`}>{build.name}</Link> <span className="muted">— {build.tagline}</span></li>)}</ul>
+              <SectionIntro eyebrow="VENDOR-STATED USE CASES" title={`What ${provider?.name ?? "the vendor"} says it can be used for`}>Vendor statements with their source. They are not Builds and not deployment evidence.</SectionIntro>
+              <ul className="build-links">
+                {vendorUseCases.map(({ useCase, source }) => (
+                  <li key={useCase.id}>
+                    <Link to={`/use-cases/${useCase.slug}`}>{useCase.name}</Link> <span className="muted">— “{source.originalDescription}”</span>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
           {!!creatorBuilds.length && (
             <section className="intelligence-section">
-              <SectionIntro eyebrow="BUILDS" title="Creator projects using it">Builds are creator showcases, not deployment evidence.</SectionIntro>
+              <SectionIntro eyebrow="BUILDS" title="Builds using it">Complete solutions published by Solution Providers. A Build is not deployment evidence.</SectionIntro>
               <ul className="build-links">{creatorBuilds.map((build) => <li key={build.id}><Link to={`/builds/${build.slug}`}>{build.name}</Link> <span className="muted">— {build.tagline}</span></li>)}</ul>
             </section>
           )}

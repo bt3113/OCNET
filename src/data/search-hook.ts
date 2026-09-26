@@ -19,6 +19,10 @@ export function useSearchIndex() {
   const { data: cases = [] } = useRecords("use_cases");
   const { data: stacks = [] } = useRecords("solution_stacks");
   const { data: articles = [] } = useRecords("articles");
+  const { data: aliases = [] } = useRecords("use_case_aliases");
+  const { data: categories = [] } = useRecords("use_case_categories");
+  const { data: useCaseSources = [] } = useRecords("use_case_sources");
+  const { data: consultants = [] } = useRecords("consultants");
   return searchDocuments({
     implementations,
     implementationContexts,
@@ -35,6 +39,10 @@ export function useSearchIndex() {
     cases,
     stacks,
     articles,
+    aliases,
+    categories,
+    useCaseSources,
+    consultants,
   });
 }
 

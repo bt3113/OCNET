@@ -300,9 +300,9 @@ test("accessibility of the compiler results state", async ({ page }) => {
 
 test("homepage outcome entry hands the intent to the Solution Compiler", async ({ page }) => {
   await page.goto(`${base}/`);
-  await expect(page.locator("main h1")).toHaveText("What are you trying to improve?");
-  await page.getByPlaceholder(/Respond to enquiries faster/).fill("Salon with two sites wants faster replies to booking messages");
-  await page.getByRole("button", { name: /Structure the problem/ }).click();
+  await expect(page.locator("main h1")).toHaveText("What are you trying to get done?");
+  await page.getByLabel("Describe your requirement").fill("Salon with two sites wants faster replies to booking messages");
+  await page.getByRole("button", { name: "Find a solution", exact: true }).click();
   await expect(page).toHaveURL(/solution-compiler\?intent=/);
   await expect(page.locator(".requirement-card").filter({ hasText: "Business" }).first()).toContainText("INFERRED");
   await expect(page.locator("#req-businessType")).toHaveValue("Salon and beauty services");

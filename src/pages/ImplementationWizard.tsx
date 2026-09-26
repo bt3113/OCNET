@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Eye, LockKeyhole, Plus, Save, ShieldAlert
 import { PageHeading } from "../components/layout";
 import { Badge, ErrorState, Skeleton } from "../components/ui";
 import { AttestationInviteDialog } from "../components/attestation";
-import { useActions, useUI } from "../state";
+import { useActions, useRecords, useUI } from "../state";
 import { useIntelligence } from "../data/intelligence-hooks";
 import { isSupabase } from "../data/repository";
 import { blueprintScan, buildSubmission, emptyDraft, lines, proposedClaims, recordScan, validateStep, type ContributionDraft, type Submission } from "../data/contribution";
@@ -60,14 +60,30 @@ export default function ImplementationWizard() {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<Submission | null>(null);
   const [invite, setInvite] = useState(false);
+  const { data: builds = [], isLoading: loadingBuilds } = useRecords("builds");
+  const buildParam = new URLSearchParams(window.location.search).get("build");
   const [draft, setDraft] = useState<ContributionDraft>(() => {
     try {
       const stored = localStorage.getItem(draftKey);
-      return stored ? { ...emptyDraft, ...(JSON.parse(stored) as Partial<ContributionDraft>) } : emptyDraft;
+      const base = stored ? { ...emptyDraft, ...(JSON.parse(stored) as Partial<ContributionDraft>) } : emptyDraft;
+      // Starting from a Build begins a fresh draft unless the saved one is for the same Build.
+      if (buildParam && base.sourceBuildId !== buildParam) return { ...emptyDraft, sourceBuildId: buildParam };
+      return base;
     } catch {
-      return emptyDraft;
+      return buildParam ? { ...emptyDraft, sourceBuildId: buildParam } : emptyDraft;
     }
   });
+  // Started from a Build: prefill the primary Use Case and the stack once, keeping anything already typed.
+  const sourceBuild = builds.find((build) => build.id === draft.sourceBuildId);
+  const [prefilled, setPrefilled] = useState(false);
+  if (sourceBuild && !prefilled) {
+    setPrefilled(true);
+    setDraft((current) => ({
+      ...current,
+      useCaseId: current.useCaseId || sourceBuild.useCaseIds[0] || "",
+      stack: current.stack.length ? current.stack : sourceBuild.stack.map((item) => ({ productId: item.productId, capabilityId: item.capabilityId || "automation", role: item.role })),
+    }));
+  }
   const [savedAt, setSavedAt] = useState<string | null>(null);
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -82,7 +98,7 @@ export default function ImplementationWizard() {
   }, [draft]);
   const templateMetrics = useMemo(() => data.definitions.filter((definition) => definition.category === "service-enquiry-booking" && !["implementation-cost", "monthly-software-cost", "maintenance-hours"].includes(definition.id)), [data.definitions]);
 
-  if (data.isLoading) return <Skeleton />;
+  if (data.isLoading || loadingBuilds) return <Skeleton />;
   if (data.isError) return <ErrorState retry={data.refetch} />;
 
   const patch = <K extends keyof ContributionDraft>(key: K, value: ContributionDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
@@ -186,6 +202,14 @@ export default function ImplementationWizard() {
         title="Document what happened — without exposing customer secrets."
         description="Fifteen short steps separate public context from private verification data. Fields are marked PUBLIC or PRIVATE. Your draft saves automatically in this browser."
       />
+      {sourceBuild && (
+        <p className="notice" role="note">
+          This record will be linked to the Build <strong>{sourceBuild.name}</strong> as a real deployment of it. The Use Case and stack were prefilled from the Build — change them if the deployment differed.{" "}
+          <button type="button" className="text-button" onClick={() => patch("sourceBuildId", undefined)}>
+            Unlink
+          </button>
+        </p>
+      )}
       <div className="implementation-wizard-shell">
         <nav className="implementation-wizard-steps" aria-label="Submission steps">
           {steps.map((label, index) => (

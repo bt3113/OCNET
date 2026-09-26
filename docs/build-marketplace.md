@@ -8,7 +8,7 @@ A **Build** is a creator-published implementation blueprint. A procurement **Pro
 - `/builds/:slug`: gallery, connected stack, architecture canvas (pan, zoom, fit, keyboard), mobile list, node details and exploratory alternatives, implementation notes, license, sources, offers, questions, updates and related builds.
 - `/creators` and `/creators/:slug`: expertise discovery, technologies, availability, Builds, offers, biography and follows.
 - `/collections` and `/collections/:slug`: private research collections, creation, rename, move, remove and save-to-collection.
-- `/creator/*`: nine-step publishing wizard with autosave; Build editing, offers, profile, messages, analytics and preferences.
+- `/creator/*`: six-step Build publisher (Basics, Use Cases, How it works, Proof, Service, Review) with autosave; Build editing, offers, profile, messages, analytics and preferences.
 - `/provider/builds`, `/provider/claims`: derived technology usage and evidence-based claims.
 - `/admin/builds`, `/admin/creators`, `/admin/offers`, `/admin/reports`, `/admin/claims`: moderation and audit.
 

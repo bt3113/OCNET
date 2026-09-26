@@ -12,14 +12,12 @@ import { offerAction, offerPrice } from "../../data/build-domain";
 import { useActions, useRecords, useUI } from "../../state";
 import { isSupabase } from "../../data/repository";
 import { Modal, Badge, ButtonLink } from "../ui";
-import { assetUrl, ProviderListingCover, SafeLink } from "./cards";
-import { isProviderListing } from "../../data/build-domain";
+import { assetUrl, SafeLink } from "./cards";
 import { videoEmbed as safeVideoEmbed } from "../media";
 export function BuildGallery({ build }: { build: Build }) {
   const [index, setIndex] = useState(0);
   const [open, setOpen] = useState(false);
   const media = build.media[index];
-  if (!media && isProviderListing(build)) return <ProviderListingCover build={build} large />;
   if (!media)
     return (
       <div className="card empty-state">

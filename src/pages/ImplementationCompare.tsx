@@ -1,4 +1,6 @@
 import { useEffect, type ReactNode } from "react";
+import { useSolutionProviders } from "../data/marketplace-hooks";
+import { providerForImplementer } from "../data/solution-providers";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Scale } from "lucide-react";
 import { PageHeading } from "../components/layout";
@@ -19,6 +21,7 @@ function Missing({ kind }: { kind: "missing" | "not-disclosed" | "not-comparable
 export default function ImplementationCompare() {
   const [params] = useSearchParams();
   const data = useIntelligence();
+  const solutionProviderList = useSolutionProviders();
   const ids = (params.get("ids") ?? "").split(",").map((value) => value.trim()).filter(Boolean).slice(0, 3);
   useEffect(() => {
     if (ids.length >= 2) track("implementation_compared", ids.join(","));
@@ -144,7 +147,7 @@ export default function ImplementationCompare() {
             <Row label="Evidence freshness">{selected.map((record) => <StalenessBadge key={record.id} state={implementationFreshness(record, now).state} />)}</Row>
             <Row label="Implementer">{selected.map((record) => {
               const partners = data.implementers.filter((partner) => record.implementerIds.includes(partner.id));
-              return partners.length ? partners.map((partner) => <Link key={partner.id} to={`/implementers/${partner.slug}`}>{partner.name}</Link>) : <Missing kind="missing" />;
+              return partners.length ? partners.map((partner) => <Link key={partner.id} to={providerForImplementer(solutionProviderList, partner.id) ? `/solution-providers/${providerForImplementer(solutionProviderList, partner.id)!.slug}` : `/solution-providers`}>{partner.name}</Link>) : <Missing kind="missing" />;
             })}</Row>
             <Row label="Known limitations">{selected.map((record) => record.knownLimitations ?? <Missing kind="missing" />)}</Row>
           </tbody>

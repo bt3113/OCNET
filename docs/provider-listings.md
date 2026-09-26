@@ -1,28 +1,28 @@
-# Provider profiles and use-case listings
+# Technology Vendor profiles (xAI / Grok)
 
-Technology companies can present their own use cases on Oracnet without those listings being mistaken for evidence.
+> Superseded model: until 2026-09-26 xAI's use cases were listed as eleven Builds. They are now **vendor-sourced Use Cases**. See [marketplace-domain-model.md](marketplace-domain-model.md#xai-migration) for the migration and [supply-model.md](supply-model.md) for why vendor statements are not supply.
 
-## xAI / Grok (first sourced provider)
+## What `src/data/vendor-xai.ts` provides
 
-`src/data/vendor-xai.ts` adds:
+- **Technology Vendor** `xai`, with a `listing` block: status `unclaimed`, compiler, retrieval date and source links. xAI's site currently brands its pages “SpaceXAI”; the profile notes this.
+- **Technologies:** Grok, Grok API, Grok Voice Agent API, Grok Imagine API and Grok Build, each with `sourceUrl`. No pricing, regions, residency or compatibility are asserted.
+- **Eleven Use Cases** (`originType: technology-vendor-sourced`) with one `use_case_sources` row each: the captured statement, source URL, retrieved/last-checked dates, capture method and `needs-verification` status, plus the Grok products named for it.
+- **Aliases** for the former listing titles, **redirects** from `/builds/xai-*`, and **retired-area redirects** for broad areas that became categories.
+- **Editorial solution patterns** (provenance `inferred`) placing Grok beside alternatives.
 
-- **Provider** `xai`, with a `listing` block: status `unclaimed`, compiler, retrieval date and source links. xAI's site currently brands its pages “SpaceXAI”; the profile notes this.
-- **Products:** Grok (assistant app), Grok API, Grok Voice Agent API, Grok Imagine API and Grok Build. Each has a `sourceUrl` and `attributeSource`. No pricing, regions, residency or compatibility are asserted.
-- **Use-case listings:** 11 Builds, one per item on [x.ai/grok/use-cases](https://x.ai/grok/use-cases), grouped by the page's sections: Business operations, Development & engineering, Content creation, Visual content, and Integration & customization. The stacks contain only products xAI names for that use case. Listings have no cost, time or outcome claims and grant no reuse rights, and each cites its source.
-- **Oracnet use cases:** six new outcomes, mapped to where the listings fit, each with an editorial solution pattern (provenance `inferred`) that places Grok beside alternatives such as Claude and the OpenAI API. Customer support and product video reuse existing use cases.
-
-The page itself was not reachable from the build environment. Listing text was taken from search-index copies of the page and xAI's documentation on 2026-09-26, and should be re-checked against the live page when the profile is claimed.
+The page was not reachable from the build environment. Statements were captured from search-index copies on 2026-09-26 and must be checked against the live page before the source status changes to `active`.
 
 ## How it appears
 
-- `/providers/:slug` (`ProviderProfile.tsx`) has four tabs: **Use cases** (listings grouped by section, plus the Oracnet outcomes they map to), **Products**, **Evidence** (independent implementation records, relationships and creator builds, kept separate from listings) and **About & sources** (sources, retrieval date and the claim lifecycle).
-- Build cards and detail pages label these entries **Provider use case / Listed by xAI**, show a typographic cover instead of borrowed artwork, and link the source. They show “View provider profile” instead of remix or creator contact.
-- Technology pages list “What xAI lists it for” separately from creator projects.
-
-## Provenance rules (tested)
-
-`tests/domain.test.ts` requires every seed row to be `demo` unless it comes from a declared vendor module. A sourced row must have HTTPS source links, no build cost or time, no reuse rights and no outcome wording. `tests/e2e/providers.spec.ts` covers the profile, listing, source links, cross-links and axe.
+- `/technology-vendors/xai` tabs: **Vendor-stated Use Cases**, **Products**, **Independent Builds**, **Implementation evidence**, **About & sources**. Vendor statements, independent supply and deployments are kept apart.
+- Each Use Case page shows “Originally listed by xAI · source · checked <date>”, and says the vendor does not own the Use Case; any Solution Provider can publish a Build for it.
+- Technology pages list the vendor-stated Use Cases separately from Builds using the technology.
+- The profile is unclaimed and says xAI has not reviewed it; nothing implies endorsement.
 
 ## Claiming (future)
 
-A claimed profile would be maintained by the company after domain verification (`status: "claimed"`), through the provider workspace. Connected-mode tables store providers and products as JSON documents, so the `listing` and `sourceUrl` fields need no migration. The optional SQL seeds do not include the xAI entries yet.
+A claimed profile (`status: "claimed"`) would be maintained by the vendor after domain verification. It could edit company details, products and its own statements, and never independent Builds, Implementation Records, evidence or reviews.
+
+## Tests
+
+`tests/domain.test.ts` requires every non-demo seed row to be xAI-sourced or editorial (`inferred`). `tests/e2e/providers.spec.ts` covers the vendor profile, attribution, redirects, the rule that vendor statements are not counted as Builds, and axe.

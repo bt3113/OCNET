@@ -14,22 +14,9 @@ import {
 import type { Build, CreatorProfile } from "../../data/build-model";
 import { useActions, useRecords, useUI } from "../../state";
 import { Badge, ButtonLink, Logo, Modal, SaveButton } from "../ui";
-import { isProviderListing, safeUrl } from "../../data/build-domain";
+import { safeUrl } from "../../data/build-domain";
 export const assetUrl = (url: string) =>
   url.startsWith("media/") ? import.meta.env.BASE_URL + url : url;
-/** Typographic cover for provider use-case listings, which carry no artwork of their own. */
-export function ProviderListingCover({ build, large = false }: { build: Build; large?: boolean }) {
-  const { data: products = [] } = useRecords("products");
-  const names = build.stack.map((item) => products.find((product) => product.id === item.productId)?.name ?? item.role);
-  return (
-    <div className={`provider-listing-cover${large ? " large" : ""}`}>
-      <span>{build.industry}</span>
-      <strong>{build.name}</strong>
-      <small>{[...new Set(names)].join(" · ")}</small>
-    </div>
-  );
-}
-
 export function BuildCard({
   build,
   variant = "grid",
@@ -39,6 +26,8 @@ export function BuildCard({
 }) {
   const { data: creators = [] } = useRecords("creator_profiles");
   const { data: products = [] } = useRecords("products");
+  const { data: useCases = [] } = useRecords("use_cases");
+  const primaryUseCase = useCases.find((useCase) => useCase.id === build.useCaseIds[0]);
   const [preview, setPreview] = useState(false);
   const [share, setShare] = useState(false);
   const creator = creators.find((c) => c.id === build.creatorId);
@@ -46,9 +35,7 @@ export function BuildCard({
   return (
     <article className={`build-card ${variant}`}>
       <Link className="build-cover" to={"/builds/" + build.slug}>
-        {!cover && isProviderListing(build) ? (
-          <ProviderListingCover build={build} />
-        ) : cover ? (
+        {cover ? (
           <BuildImage
             loading="lazy"
             src={assetUrl(cover.url)}
@@ -61,16 +48,12 @@ export function BuildCard({
           </div>
         )}
         <span className="build-cover-label">
-          {build.provenance === "demo"
-            ? "ILLUSTRATIVE BUILD"
-            : isProviderListing(build)
-              ? "PROVIDER USE CASE"
-              : "BUILD SHOWCASE"}
+          {build.provenance === "demo" ? "ILLUSTRATIVE BUILD" : "BUILD"}
         </span>
       </Link>
       <div className="build-card-body">
         <div className="row between">
-          <span className="eyebrow">{build.industry || "NEW BUILD"}</span>
+          <span className="eyebrow build-card-use-case">{primaryUseCase?.name ?? (build.industry || "New Build")}</span>
           <SaveButton id={build.id} name={build.name} type="builds" />
         </div>
         <h3>
@@ -79,12 +62,12 @@ export function BuildCard({
         <p>{build.tagline}</p>
         <Link
           className="creator-byline"
-          to={"/creators/" + (creator?.slug ?? "")}
+          to={"/solution-providers/" + (creator?.slug ?? "")}
         >
           <span className={"mini-avatar " + (creator?.color ?? "sand")}>
             {creator?.name.slice(0, 1) ?? "C"}
           </span>
-          {isProviderListing(build) ? "Listed by" : "Built by"} {creator?.name ?? "Creator"}
+          Built by {creator?.name ?? "a Solution Provider"}
         </Link>
         <div className="stack-chips">
           {build.stack.slice(0, 4).map((s) => {
@@ -242,7 +225,7 @@ export function CreatorCard({ creator }: { creator: CreatorProfile }) {
         <Badge>{creator.provenance}</Badge>
       </div>
       <h3>
-        <Link to={"/creators/" + creator.slug}>{creator.name}</Link>
+        <Link to={"/solution-providers/" + creator.slug}>{creator.name}</Link>
       </h3>
       <p>{creator.headline}</p>
       <div className="tags">
@@ -258,7 +241,7 @@ export function CreatorCard({ creator }: { creator: CreatorProfile }) {
         <Link
           className="icon-button"
           aria-label={"View " + creator.name}
-          to={"/creators/" + creator.slug}
+          to={"/solution-providers/" + creator.slug}
         >
           <ArrowRight size={18} />
         </Link>

@@ -3,6 +3,7 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useRecords } from "../state";
 import { filterBuilds, type BuildFilters } from "../data/build-domain";
+import { approvedUseCases, isIndexableBuild } from "../data/use-case-domain";
 import { useMarketplaceSearch } from "../data/search-hook";
 import { PageHeading } from "../components/layout";
 import {
@@ -29,7 +30,7 @@ export default function BuildDiscovery() {
   const { data: products = [] } = useRecords("products");
   const { data: creators = [] } = useRecords("creator_profiles");
   const { data: cases = [] } = useRecords("use_cases");
-  const { data: categories = [] } = useRecords("categories");
+  const { data: taxonomy = [] } = useRecords("use_case_categories");
   const { data: offers = [] } = useRecords("build_offers");
   const q = params.get("q") || "";
   const page = Math.max(1, Number(params.get("page")) || 1);
@@ -41,13 +42,17 @@ export default function BuildDiscovery() {
     setParams(next, { replace: true });
   }
   const filters = Object.fromEntries(params) as BuildFilters;
+  const approvedCases = approvedUseCases(cases).sort((a, b) => a.name.localeCompare(b.name));
+  const workCategories = taxonomy.filter((item) => item.level === "category").sort((a, b) => a.sortOrder - b.sortOrder);
   let filtered = filterBuilds(
     builds,
-    { ...filters, q: "" },
+    { ...filters, category: "", q: "" },
     products,
     creators,
     offers,
-  );
+  )
+    .filter((b) => isIndexableBuild(b, cases))
+    .filter((b) => !params.get("category") || b.useCaseIds.some((id) => cases.find((useCase) => useCase.id === id)?.categoryId === params.get("category")));
   const search = useMarketplaceSearch(
     q,
     searchPage ? params.get("type") || undefined : "Build",
@@ -68,10 +73,10 @@ export default function BuildDiscovery() {
     <div className="build-filter-fields">
       {(
         [
-          ["useCase", "Use case", cases],
-          ["category", "Category", categories],
+          ["useCase", "Use Case", approvedCases],
+          ["category", "Category", workCategories],
           ["technology", "Technology used", products],
-          ["creator", "Creator", creators],
+          ["creator", "Solution Provider", creators],
           [
             "industry",
             "Industry",
@@ -88,7 +93,7 @@ export default function BuildDiscovery() {
             value={params.get(key) || ""}
             onChange={(e) => set(key, e.target.value)}
           >
-            <option value="">All {label.toLowerCase()}s</option>
+            <option value="">Any</option>
             {rows.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -130,23 +135,23 @@ export default function BuildDiscovery() {
   return (
     <>
       <PageHeading
-        eyebrow="IDEAS, MADE TANGIBLE"
+        eyebrow="BUILDS"
         title={
           searchPage
             ? "Search the implementation graph"
             : pathname === "/explore"
               ? "What do you want to build?"
-              : "Discover how it’s built."
+              : "Complete solutions, published by Solution Providers."
         }
         description={
           searchPage
             ? "Connected results across builds, technologies, use cases and the people behind them."
-            : "Explore the outcomes, decisions and technologies behind useful implementations."
+            : "Each Build shows how a solution works and which Use Cases it handles. Deployment evidence is shown separately, on each Build’s Proof tab."
         }
         action={
           <ButtonLink to="/creator/builds/new">
             <Plus size={17} />
-            Publish a build
+            Publish a Build
           </ButtonLink>
         }
       />
@@ -179,28 +184,7 @@ export default function BuildDiscovery() {
               {searchPage ? matches.length : filtered.length}{" "}
               {searchPage ? "matching records" : "builds"}
             </span>
-            {searchPage ? (
-              <label>
-                Result type
-                <select
-                  value={params.get("type") || ""}
-                  onChange={(e) => set("type", e.target.value)}
-                >
-                  <option value="">All types</option>
-                  {[
-                    "Build",
-                    "Technology",
-                    "Use case",
-                    "Creator",
-                    "Provider",
-                    "Stack",
-                    "Resource",
-                  ].map((t) => (
-                    <option key={t}>{t}</option>
-                  ))}
-                </select>
-              </label>
-            ) : (
+            {searchPage ? null : (
               <label>
                 Sort builds
                 <select

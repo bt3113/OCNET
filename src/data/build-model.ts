@@ -1,4 +1,5 @@
 import type { RecordBase, Role } from "./model";
+import type { SolutionProviderType } from "./marketplace-model";
 export type Visibility =
   "draft" | "public" | "unlisted" | "private" | "archived";
 export type Moderation = "pending" | "approved" | "flagged" | "rejected";
@@ -73,6 +74,10 @@ export interface Build extends RecordBase {
   updatedAt: string;
   featured: boolean;
   ownershipConfirmed: boolean;
+  /** At most one pending Use Case proposal (`use_case_proposals`). Counts toward the 3-Use-Case limit. */
+  useCaseProposalId?: string | null;
+  /** Primary reusable Blueprint for this Build (`blueprints`). */
+  blueprintId?: string | null;
 }
 export interface CreatorProfile extends RecordBase {
   slug: string;
@@ -90,6 +95,10 @@ export interface CreatorProfile extends RecordBase {
   kind: "individual" | "studio" | "company";
   verification: "unverified" | "verified";
   color: string;
+  /** Public Solution Provider type. */
+  providerType?: SolutionProviderType;
+  /** The same organisation's implementer record, when it also documents deployments. */
+  integratorId?: string;
 }
 export type OfferType =
   | "Free guide"

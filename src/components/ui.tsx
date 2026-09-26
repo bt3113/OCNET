@@ -419,7 +419,7 @@ export function TechnologyCard({ product: p }: { product: Product }) {
 export function ProviderCard({
   provider: p,
   compact = false,
-  type = "providers",
+  type = "technology-vendors",
 }: {
   provider: Provider;
   compact?: boolean;

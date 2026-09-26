@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, CheckCircle2, CircleHelp, Download, FileSearch, Layers3, Plus, RotateCcw, Scale, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { ArrowRight, BookOpen, Check, CheckCircle2, CircleHelp, Download, FileSearch, Layers3, Plus, RotateCcw, Scale, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import type { Product, UseCase } from "../data/model";
 import type {
   ImplementationRecord,
@@ -10,7 +10,15 @@ import type {
   SolutionCandidate,
   SolutionCandidateItem,
 } from "../data/intelligence-model";
-import type { CompiledSolution, CompilerCatalogue, CompilerStage, DecisionTrace } from "../data/solution-compiler";
+import type {
+  CandidateProvenance,
+  CompiledSolution,
+  CompilerCatalogue,
+  CompilerStage,
+  CompilerSupply,
+  DecisionTrace,
+  UseCaseOptionGroup,
+} from "../data/solution-compiler";
 import { verifyReproducibility } from "../data/solution-compiler";
 import { downloadJson } from "../data/manifest";
 import { fieldLabels, strengthOf } from "../data/requirement";
@@ -118,13 +126,15 @@ function RequirementCard({
 
 export function RequirementBuilder({
   profile,
-  useCases,
+  useCaseGroups,
   onChange,
 }: {
   profile: RequirementProfile;
-  useCases: UseCase[];
+  /** Every approved Use Case, grouped by category, labelled with its compiler coverage. */
+  useCaseGroups: UseCaseOptionGroup[];
   onChange: (profile: RequirementProfile) => void;
 }) {
+  const listed = useCaseGroups.some((group) => group.options.some((option) => option.useCase.id === profile.useCaseId));
   const set = <K extends keyof RequirementProfile>(key: K, value: RequirementProfile[K], field?: RequirementField) =>
     onChange({
       ...profile,
@@ -147,7 +157,12 @@ export function RequirementBuilder({
           {card("useCaseId", (
             <select id="req-useCaseId" value={profile.useCaseId ?? ""} onChange={(event) => set("useCaseId", event.target.value || undefined, "useCaseId")}>
               <option value="">Not selected</option>
-              {useCases.map((useCase) => <option key={useCase.id} value={useCase.id}>{useCase.name}</option>)}
+              {profile.useCaseId && !listed && <option value={profile.useCaseId}>{profile.useCaseId} · not in the catalogue</option>}
+              {useCaseGroups.map((group) => (
+                <optgroup key={group.id} label={group.label}>
+                  {group.options.map((option) => <option key={option.useCase.id} value={option.useCase.id}>{option.label}</option>)}
+                </optgroup>
+              ))}
             </select>
           ))}
           {card("businessType", <input id="req-businessType" value={profile.businessType} onChange={(event) => set("businessType", event.target.value, "businessType")} placeholder="e.g. Property services" />, false)}
@@ -233,6 +248,83 @@ export function RequirementBuilder({
   );
 }
 
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+
+/**
+ * States what the compiler can honestly do for the selected Use Case. For a
+ * catalogue-only Use Case it replaces the compile step: nothing is invented.
+ */
+export function CompilerCoverageNotice({ id, useCase, supply }: { id?: string; useCase?: UseCase; supply: CompilerSupply | null }) {
+  if (!useCase || !supply) {
+    return (
+      <p id={id} className="coverage-line muted">
+        <CircleHelp size={15} aria-hidden /> Choose a Use Case to compile. The compiler only uses Blueprints published for the Use Case you choose.
+      </p>
+    );
+  }
+  const blueprints = supply.blueprintIds.length;
+  const records = supply.implementationIds.length;
+  if (supply.coverage === "blueprint-available")
+    return (
+      <p id={id} className="coverage-line">
+        <Layers3 size={15} aria-hidden /> {plural(blueprints, "published Blueprint")} {blueprints === 1 ? "matches" : "match"}. No deployment evidence has been published for this Use Case yet.
+      </p>
+    );
+  if (supply.coverage === "evidence-available")
+    return (
+      <p id={id} className="coverage-line">
+        <CheckCircle2 size={15} aria-hidden /> {plural(blueprints, "published Blueprint")} {blueprints === 1 ? "matches" : "match"}; {plural(records, "public Implementation Record")} {records === 1 ? "is" : "are"} available as evidence.
+      </p>
+    );
+  return (
+    <section id={id} className="coverage-notice" aria-labelledby={id ? `${id}-title` : undefined}>
+      <h3 id={id ? `${id}-title` : undefined}>
+        <BookOpen size={18} aria-hidden /> We don’t yet have a reusable Blueprint for this Use Case.
+      </h3>
+      <p>
+        Oracnet does not invent solutions. The Solution Compiler only works from Blueprints that Solution Providers have published for “{useCase.name}”,
+        and none has been published yet, so there are no approaches to compile. You can still see what the catalogue lists for this Use Case, or ask
+        Solution Providers directly.
+      </p>
+      <ul className="coverage-links" aria-label="Next steps for this Use Case">
+        <li><Link to={`/use-cases/${useCase.slug}`}>View Use Case</Link></li>
+        <li><Link to={`/builds?useCase=${encodeURIComponent(useCase.id)}`}>Browse Builds</Link></li>
+        <li><Link to={`/use-cases/${useCase.slug}?tab=technologies`}>Browse technologies</Link></li>
+        <li><Link className="button dark" to="/app/projects/new">Post a Project / RFQ <ArrowRight size={15} aria-hidden /></Link></li>
+      </ul>
+      <p className="coverage-secondary">
+        Are you a Solution Provider? <Link to={`/creator/builds/new?useCase=${encodeURIComponent(useCase.id)}`}>Publish a Build</Link> for this Use Case.
+      </p>
+    </section>
+  );
+}
+
+/** Where a candidate comes from. Facts only: no ranking signal. */
+function CandidateProvenanceList({ provenance }: { provenance?: CandidateProvenance }) {
+  if (!provenance?.blueprint) return null;
+  const { blueprint, provider, build, evidence } = provenance;
+  return (
+    <dl className="candidate-provenance">
+      <div>
+        <dt>Source</dt>
+        <dd><Link to={`/blueprints/${blueprint.slug}`}>{blueprint.name}</Link></dd>
+      </div>
+      <div>
+        <dt>Published / maintained by</dt>
+        <dd>{provider ? <Link to={`/solution-providers/${provider.slug}`}>{provider.name}</Link> : <span className="muted">Maintainer not listed</span>}</dd>
+      </div>
+      <div>
+        <dt>Build</dt>
+        <dd>{build ? <Link to={`/builds/${build.slug}`}>{build.name}</Link> : <span className="muted">No Build linked</span>}</dd>
+      </div>
+      <div>
+        <dt>Evidence</dt>
+        <dd>{evidence.length ? `Supported by ${plural(evidence.length, "Implementation Record")}` : "0 Implementation Records"}</dd>
+      </div>
+    </dl>
+  );
+}
+
 export function SolutionCompilerProgress({ stages }: { stages: CompilerStage[] }) {
   return (
     <ol className="compiler-progress" aria-label="Compiler stages" aria-live="polite">
@@ -283,6 +375,7 @@ export function SolutionCandidateCard({
   items,
   products,
   implementations,
+  provenance,
   onSubstitute,
   onExplain,
   onRequest,
@@ -291,6 +384,8 @@ export function SolutionCandidateCard({
   items: SolutionCandidateItem[];
   products: Product[];
   implementations: ImplementationRecord[];
+  /** Blueprint, Solution Provider, Build and evidence behind this candidate. */
+  provenance?: CandidateProvenance;
   onSubstitute: (slotId: string, productId: string) => void;
   onExplain: () => void;
   onRequest: () => void;
@@ -316,6 +411,7 @@ export function SolutionCandidateCard({
           {!!candidate.equivalentVariants && <span className="muted">+{candidate.equivalentVariants} equivalent component variant{candidate.equivalentVariants === 1 ? "" : "s"}</span>}
         </div>
       </div>
+      <CandidateProvenanceList provenance={provenance} />
       {!candidate.feasible && (
         <div className="candidate-infeasible" role="alert">
           <strong>Your change makes this option infeasible:</strong>

@@ -166,6 +166,8 @@ interface Row {
   implementerId: string;
   creatorId: string;
   blueprintIds: string[];
+  /** Build this deployment was delivered from, when one is published. */
+  sourceBuildId?: string;
   reviewedAt: string;
   nextReviewAt: string;
   dates: { start: string; live: string; baseline: [string, string]; observed: [string, string] };
@@ -196,6 +198,7 @@ const rows: Row[] = [
     implementerId: "partner-0",
     creatorId: "alex-chen",
     blueprintIds: ["inquiry-booking-reference"],
+    sourceBuildId: "service-enquiry-booking-system",
     reviewedAt: "2026-09-20",
     nextReviewAt: "2027-03-20",
     dates: { start: "2026-05-04", live: "2026-06-08", baseline: ["2026-04-01", "2026-04-30"], observed: ["2026-07-01", "2026-07-31"] },
@@ -306,6 +309,7 @@ const rows: Row[] = [
     implementerId: "partner-2",
     creatorId: "maya-rivera",
     blueprintIds: ["missed-call-textback"],
+    sourceBuildId: "missed-call-textback-kit",
     reviewedAt: "2025-08-01",
     nextReviewAt: "2026-02-01",
     dates: { start: "2025-05-05", live: "2025-05-12", baseline: ["2025-03-01", "2025-04-30"], observed: ["2025-06-01", "2025-07-31"] },
@@ -356,6 +360,7 @@ export const implementationRecords: IntelligenceTables["implementation_records"]
   creatorIds: [r.creatorId],
   providerIds: [],
   derivedBlueprintIds: r.blueprintIds,
+  sourceBuildId: r.sourceBuildId,
   lastEvidenceReviewAt: r.reviewedAt,
   nextEvidenceReviewAt: r.nextReviewAt,
   stalenessState: "unknown",
@@ -795,6 +800,7 @@ export const blueprints: IntelligenceTables["blueprints"][] = [
     ownerId: "demo-user",
     description: "Sanitized reference architecture for capturing calls and web enquiries, qualifying them, updating the CRM, booking against availability and routing exceptions to people.",
     derivedFromImplementationId: "property-enquiry-automation",
+    buildId: "service-enquiry-booking-system",
     useCaseIds: ["enquiry-to-booking"],
     capabilityIds: ["telephony", "voice", "language", "automation", "crm", "calendar", "human-escalation"],
     currentVersionId: "inquiry-booking-reference-v1-1",
@@ -804,7 +810,7 @@ export const blueprints: IntelligenceTables["blueprints"][] = [
     reuseRights: "reference-architecture",
     sourceAvailable: false,
     commercialUseAllowed: false,
-    maintainerId: "alex-chen",
+    maintainerId: "northstar-studio",
     lastValidatedAt: "2026-09-20",
     compatibilityState: "unknown",
     knownLimitations: "Customer-specific CRM fields, branch rules, emergency escalation rules and compliance controls are intentionally absent.",
@@ -880,6 +886,7 @@ export const blueprints: IntelligenceTables["blueprints"][] = [
     ownerId: "demo-user",
     description: "Minimal pattern: a missed call triggers an SMS with a short qualification form, a CRM record and bookable slots.",
     derivedFromImplementationId: "trades-missed-call-textback",
+    buildId: "missed-call-textback-kit",
     useCaseIds: ["enquiry-to-booking"],
     capabilityIds: ["telephony", "automation", "language", "calendar", "human-escalation"],
     currentVersionId: "missed-call-textback-v2",
@@ -889,7 +896,7 @@ export const blueprints: IntelligenceTables["blueprints"][] = [
     reuseRights: "open-source",
     sourceAvailable: true,
     commercialUseAllowed: true,
-    maintainerId: "maya-rivera",
+    maintainerId: "atlas-automation",
     lastValidatedAt: "2026-07-01",
     compatibilityState: "unknown",
     knownLimitations: "Only handles missed calls; answered calls and web enquiries are out of scope.",

@@ -8,6 +8,7 @@ import {
   ImplementationCard,
 } from "../components/intelligence";
 import {
+  CompilerCoverageNotice,
   DecisionTraceDrawer,
   RequirementBuilder,
   SolutionCandidateCard,
@@ -15,9 +16,18 @@ import {
   SolutionExplanationDrawer,
   SolutionTradeoffView,
 } from "../components/compiler";
-import { useActions, useUI } from "../state";
+import { useActions, useRecords, useUI } from "../state";
 import { useIntelligence, isPublicRecord } from "../data/intelligence-hooks";
-import { compileSolutions, substituteComponent, type CompiledSolution } from "../data/solution-compiler";
+import {
+  canCompileFor,
+  candidateProvenance,
+  compileSolutions,
+  compilerSupply,
+  substituteComponent,
+  groupUseCaseOptions,
+  type CompiledSolution,
+} from "../data/solution-compiler";
+import { solutionProviders } from "../data/solution-providers";
 import { emptyProfile, profileFromIntent, validateProfile } from "../data/requirement";
 import { track } from "../data/analytics";
 import { isSupabase } from "../data/repository";
@@ -36,6 +46,11 @@ export default function SolutionCompiler() {
   const navigate = useNavigate();
   const actions = useActions();
   const data = useIntelligence();
+  const categoriesQuery = useRecords("use_case_categories");
+  const buildsQuery = useRecords("builds");
+  const creatorsQuery = useRecords("creator_profiles");
+  const consultantsQuery = useRecords("consultants");
+  const marketplaceQueries = [categoriesQuery, buildsQuery, creatorsQuery, consultantsQuery];
   const [intent, setIntent] = useState("");
   const [profile, setProfile] = useState<RequirementProfile | null>(null);
   const [result, setResult] = useState<CompiledSolution | null>(null);
@@ -56,7 +71,18 @@ export default function SolutionCompiler() {
     if (incoming.length >= 12) setProfile(profileFromIntent(incoming, userId || "anonymous", `requirement-${crypto.randomUUID()}`, data.products));
   }, [params, data.isLoading, data.products, userId]);
   const validation = profile ? validateProfile(profile) : null;
-  const serviceUseCases = data.useCases.filter((useCase) => data.blueprints.some((blueprint) => blueprint.useCaseIds.includes(useCase.id)));
+  const categories = categoriesQuery.data;
+  const useCaseGroups = useMemo(
+    () => groupUseCaseOptions(data.useCases, categories ?? [], data.catalogue),
+    [data.useCases, categories, data.catalogue],
+  );
+  const creators = creatorsQuery.data;
+  const consultants = consultantsQuery.data;
+  const providers = useMemo(() => solutionProviders(creators ?? [], data.implementers, consultants ?? []), [creators, data.implementers, consultants]);
+  // Coverage decides whether there is anything to compile. Never fabricated.
+  const selectedUseCase = profile?.useCaseId ? data.useCases.find((useCase) => useCase.id === profile.useCaseId) : undefined;
+  const supply = selectedUseCase ? compilerSupply(selectedUseCase.id, data.catalogue) : null;
+  const compilable = canCompileFor(supply);
 
   const ordered = useMemo(() => {
     if (!result) return [];
@@ -71,8 +97,16 @@ export default function SolutionCompiler() {
     return list.sort((a, b) => Number(a.dominated) - Number(b.dominated) || Number(!a.feasible) - Number(!b.feasible) || key[order](a) - key[order](b));
   }, [result, order]);
 
-  if (data.isLoading) return <Skeleton />;
-  if (data.isError) return <ErrorState retry={data.refetch} />;
+  if (data.isLoading || marketplaceQueries.some((query) => query.isLoading)) return <Skeleton />;
+  if (data.isError || marketplaceQueries.some((query) => query.isError))
+    return (
+      <ErrorState
+        retry={() => {
+          data.refetch();
+          marketplaceQueries.forEach((query) => void query.refetch());
+        }}
+      />
+    );
 
   const structure = () => {
     if (intent.trim().length < 12) {
@@ -93,7 +127,7 @@ export default function SolutionCompiler() {
     setResult(null);
   };
   const compile = () => {
-    if (!profile || !validation?.ok) return;
+    if (!profile || !validation?.ok || !compilable) return;
     const compiled = compileSolutions(profile, data.catalogue);
     setResult(compiled);
     setEditing(false);
@@ -258,12 +292,21 @@ export default function SolutionCompiler() {
             Values marked <strong>INFERRED</strong> came from your text — confirm or correct them. Mark each constraint <strong>Hard</strong> (must hold),
             <strong> Soft</strong> (preference) or <strong>Info</strong> (context only).
           </p>
-          <RequirementBuilder profile={profile} useCases={serviceUseCases} onChange={update} />
+          <RequirementBuilder profile={profile} useCaseGroups={useCaseGroups} onChange={update} />
           {validation && !validation.ok && (
             <div className="notice" role="alert"><CircleHelp size={18} aria-hidden /><p>{validation.errors.join(" ")}</p></div>
           )}
+          <div aria-live="polite">
+            <CompilerCoverageNotice id="compiler-coverage" useCase={selectedUseCase} supply={supply} />
+          </div>
           <div className="row wrap compiler-run-row">
-            <button className="button dark" type="button" disabled={!validation?.ok} onClick={compile}>
+            <button
+              className="button dark"
+              type="button"
+              disabled={!validation?.ok || !compilable}
+              aria-describedby={compilable ? undefined : "compiler-coverage"}
+              onClick={compile}
+            >
               <SlidersHorizontal size={17} aria-hidden /> Compile feasible approaches
             </button>
             {!!profile.inferredFields?.length && (
@@ -278,7 +321,11 @@ export default function SolutionCompiler() {
       {result && profile && (
         <div id="compiler-results" tabIndex={-1} className="compiler-results-region">
           <section className="intelligence-section">
-            <div className="compiler-step-label"><span>3</span> Compare feasible approaches</div>
+            <div className="compiler-step-label"><span>3</span> Solution approaches based on published Blueprints</div>
+            <p className="tab-section-note">
+              Oracnet found {result.trace.candidatePool.length} published Blueprint{result.trace.candidatePool.length === 1 ? "" : "s"} matching your requirement.
+              It checked their components against your constraints and shows available implementation evidence separately.
+            </p>
             <p className="tab-section-note">Labels appear only where recorded data supports them — there is no “best stack”. Change a component to re-check feasibility.</p>
             <div className="compiler-toolbar card">
               <label>
@@ -311,6 +358,12 @@ export default function SolutionCompiler() {
                     items={result.items}
                     products={data.products}
                     implementations={data.implementations}
+                    provenance={candidateProvenance(candidate.sourceBlueprintId, {
+                      blueprints: data.blueprints,
+                      builds: buildsQuery.data ?? [],
+                      providers,
+                      implementations: data.implementations,
+                    })}
                     onSubstitute={(slotId, productId) => substitute(candidate.id, slotId, productId)}
                     onExplain={() => {
                       setExplain(candidate);

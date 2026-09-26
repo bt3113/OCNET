@@ -1,11 +1,27 @@
 import {
-  xaiBuilds,
-  xaiCreator,
   xaiProducts,
   xaiProvider,
   xaiRelatedStacks,
-  xaiRelatedUseCases,
+  xaiUseCaseAliases,
+  xaiUseCaseSources,
+  xaiUseCases,
+  xaiRetiredUseCaseRedirects,
 } from "./vendor-xai.ts";
+import {
+  editorialAliases,
+  editorialSource,
+  editorialUseCases,
+  editorialUseCaseUpdates,
+  useCaseCategories,
+} from "./taxonomy-seed.ts";
+import {
+  buildUseCaseAssignments,
+  creatorProviderTypes,
+  integratorProviderTypes,
+  marketplaceBuilds,
+  marketplaceCreators,
+  marketplaceOffers,
+} from "./marketplace-seed.ts";
 import { buildSeed, buildProducts, buildProviders } from "./build-seed.ts";
 import {
   intelligenceProducts,
@@ -559,13 +575,31 @@ providers.push(...buildProviders, ...intelligenceProviders, xaiProvider);
 products.push(...buildProducts, ...intelligenceProducts, ...xaiProducts);
 for (const product of products) Object.assign(product, productAttributeOverrides[product.id] ?? {});
 useCases.unshift(...intelligenceUseCases);
-useCases.push(...xaiRelatedUseCases);
+// Editorial placement in the work taxonomy; clearer titles where the old one named a broad area.
+for (const useCase of useCases) {
+  const update = editorialUseCaseUpdates[useCase.id];
+  if (update) Object.assign(useCase, update, { status: "approved", originType: "oracnet-editorial", originEntityId: "oracnet-editorial" });
+}
+useCases.push(...editorialUseCases, ...xaiUseCases);
 stacks.unshift(...intelligenceStacks);
 stacks.push(...xaiRelatedStacks);
+for (const partner of integrators) Object.assign(partner, { providerType: integratorProviderTypes[partner.id] });
+for (const consultant of consultants) Object.assign(consultant, { providerType: "Consultancy" });
+const demoBuilds = (buildSeed.builds ?? []).map((build) => ({ ...build, useCaseIds: buildUseCaseAssignments[build.id] ?? build.useCaseIds }));
+const creatorProfiles = [...(buildSeed.creator_profiles ?? []), ...marketplaceCreators].map((creator) => ({ ...creator, ...creatorProviderTypes[creator.id] }));
 export const seed: Partial<{ [K in Table]: Tables[K][] }> = {
   ...buildSeed,
-  builds: [...(buildSeed.builds ?? []), ...xaiBuilds],
-  creator_profiles: [...(buildSeed.creator_profiles ?? []), xaiCreator],
+  builds: [...demoBuilds, ...marketplaceBuilds],
+  creator_profiles: creatorProfiles,
+  build_offers: [...(buildSeed.build_offers ?? []), ...marketplaceOffers],
+  use_case_categories: useCaseCategories,
+  use_case_sources: [
+    ...useCases.filter((useCase) => useCase.originType !== "technology-vendor-sourced").map(editorialSource),
+    ...xaiUseCaseSources,
+  ],
+  use_case_aliases: [...editorialAliases, ...xaiUseCaseAliases],
+  use_case_proposals: [],
+  use_case_redirects: xaiRetiredUseCaseRedirects,
   organizations: [
     {
       id: "northstar",
@@ -586,7 +620,7 @@ export const seed: Partial<{ [K in Table]: Tables[K][] }> = {
   capabilities: [
     ...new Set([
       ...products.flatMap((p) => p.capabilityIds),
-      ...(buildSeed.builds ?? []).flatMap((b) => b.capabilityIds),
+      ...[...demoBuilds, ...marketplaceBuilds].flatMap((b) => b.capabilityIds),
     ]),
   ].map((id) => ({
     id,

@@ -195,7 +195,7 @@ export default function Workspace() {
               <EmptyState
                 title="No proposals yet"
                 description="Your project brief is ready to share with potential partners."
-                to="/integrators"
+                to="/solution-providers"
                 action="Find partners"
               />
             )}
@@ -250,7 +250,7 @@ export default function Workspace() {
               >
                 {p.status === "closed" ? "Reopen project" : "Close project"}
               </button>
-              <ButtonLink to="/integrators">
+              <ButtonLink to="/solution-providers">
                 Find a partner
                 <ArrowRight size={17} />
               </ButtonLink>
@@ -410,8 +410,8 @@ export default function Workspace() {
               <EmptyState
                 title="Start a useful conversation"
                 description="Contact a provider from its profile to create an enquiry."
-                to="/providers"
-                action="Explore providers"
+                to="/solution-providers"
+                action="Explore Solution Providers"
               />
             )}
           </section>
