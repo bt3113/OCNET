@@ -155,15 +155,31 @@ Production hosting + observability review
 
 Do not collapse those acceptance stages into a claim that the current static Pages demo is an enterprise production deployment.
 
-## Engineering follow-ups (not blockers, not yet done)
+## Engineering follow-ups: completed 2026-09-27
 
-Checked against `main` at `bc0a84e`:
+Each item from the first handover is now built and tested. Migration `202609270001_marketplace_followups.sql` holds the database side; `docs/qa.md` has the test counts.
 
-- **Taxonomy seed for connected mode.** `use_case_categories`, editorial placements, aliases, redirects and the xAI `use_case_sources` exist only in the TypeScript demo seed (`src/data/taxonomy-seed.ts`, `src/data/vendor-xai.ts`); `supabase/seed.sql` has none of them. Add a data migration or seed step before the Supabase staging run above.
-- **Proposal outcome notifications.** A provider only sees a mapped, approved or rejected proposal on the dashboard (“Your Use Case proposals” in `src/components/SupplyGaps.tsx`). Nothing notifies them, in-app or by email.
-- **Moderation gaps.** `/admin/use-cases` can add labels and archive a Use Case, but has no UI to edit or remove a label or to un-archive.
-- **Vendor claim flow.** “Claim this profile” on `/technology-vendors/:slug` links to `/provider/claims`. Domain or email verification for vendors is not built.
-- **Dead code.** The `providerType` branch in `src/pages/Discovery.tsx` belongs to the removed `/providers` directory route. The unused `solution_explanations` table (`202609250001`) can be dropped in a later migration.
-- **Performance.** The main bundle is about 496 kB (156 kB gzip) and was not re-measured in the field for this release (no LCP/INP data).
-- **Scheduled jobs.** Still missing for attestation expiry, contact purge, freshness recompute and search embeddings (see `implementation-progress.md`).
-- **Legal review.** Still to do: terms, marketplace terms, attestation wording, retention periods and the vendor-content attribution policy.
+| Follow-up | What was done | Evidence |
+| --- | --- | --- |
+| Taxonomy seed for connected mode | `scripts/export-seed.mjs` writes categories, sources, aliases and redirects into `supabase/seed.sql`, keeping third-party/inferred provenance; only approved Use Cases are published | `tests/security/seed.test.ts` applies the seed after every migration (counts, xAI provenance, idempotence, anonymous visibility) |
+| Proposal outcome notifications | Map/approve/reject notify the proposer: DB trigger in connected mode, moderation service in the demo, same wording | PGlite test (only the proposer sees them; read-state only), unit test, E2E |
+| Moderation gaps | Edit or remove labels; restore archived Use Cases (admin RPC `restore_use_case`); every label change audited by trigger | PGlite tests, E2E edit/remove/archive/restore |
+| Vendor claim flow | Claim needs the vendor's own domain, a work email there and a DNS TXT record `_oracnet-verification.<domain>`; reviewer checks it at `/admin/vendor-claims` via DNS-over-HTTPS; approval needs a verified check and marks the listing claimed (trigger + audit) | PGlite tests (domain/email rules, no self-verification, approval constraint), 6 unit tests, E2E claim → check → approve |
+| Dead code | Removed Discovery's unreachable provider/use-case/search branches and the unused `solution_explanations` table | Typecheck, lint, E2E |
+| Performance | Demo catalogue loads on demand; `motion` removed; Supabase no longer preloaded. Startup JS ~989 kB → ~515 kB raw (~301 → ~161 kB gzip). Lab LCP on the production build (390 px): ~0.2 s unthrottled, ~2.1–2.3 s at 4× CPU + fast 4G; CLS ≈ 0 | Local lab measurement only; no field (RUM) data |
+| Scheduled jobs | `run_marketplace_maintenance()` expires attestation links, purges attestor contacts and refreshes evidence freshness (180/365 days); scheduled daily by pg_cron when the extension is enabled | PGlite test, including refusal for normal users |
+
+### Defects found and fixed while doing this
+
+- **Seed would not load on a real database.** `supabase/seed-builds.sql` referenced an unmapped owner, and Blueprints that aren't seeded. Fixed in the export script.
+- **Missing profile columns.** `creator_profiles` had no `providerType` or `integratorId` columns. Added them; linking a profile to an implementer (`integratorId`) is admin-only, because it credits that implementer's deployment records to the profile.
+- **Approved Builds rejected on save.** The approved-Build-needs-a-Use-Case check ran per row. `save_build` writes the Build before its links, so any approved document was rejected. The check now runs at commit, and removing a Build's last Use Case is refused the same way.
+- **Vendor claim review was unreachable.** `/admin/claims` renders evidence claims instead. Claims now have their own queue at `/admin/vendor-claims`.
+- **Maintenance function privilege check.** An early draft checked `current_user` inside a `SECURITY DEFINER` function, which let any user through. Caught by the new test before release.
+
+### Still open (engineering)
+
+- **Search embeddings job:** needs an embedding provider and key (see `202609250004`).
+- **DNS check location:** it runs in the reviewer's browser and is recorded on the claim. Moving it into an Edge Function would make the result independent of the reviewer.
+- **Vendor editing after a claim:** a claimed profile is labelled as vendor-maintained, but edit rights still require an administrator to grant the claimant membership.
+- **Legal review:** terms, marketplace terms, attestation wording, retention periods and the vendor-content attribution policy. This needs a lawyer.

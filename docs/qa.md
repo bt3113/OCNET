@@ -1,3 +1,34 @@
+# QA record — handover follow-ups (2026-09-27)
+
+Run locally with Node 22, Vitest, PGlite and Playwright (Chromium 1194 via `CHROMIUM_EXECUTABLE_PATH`).
+
+| Check | Result |
+| --- | --- |
+| `npm run lint`, `npm run typecheck` | pass |
+| `npm test` | **175 passed** (17 files), including 64 PGlite security tests: new `seed.test.ts` (4) and `followups.test.ts` (10) |
+| `npm run test:e2e` | **85 passed** |
+| `npm run build` | pass; 238 route entry points; admin routes stay out of the sitemap |
+| `npm audit --audit-level=high` | 0 vulnerabilities |
+
+**Performance.** Lab measurement on the production build at 390 px width (median of 3):
+
+| Route | LCP, unthrottled | LCP, 4× CPU + fast 4G |
+| --- | --- | --- |
+| `/` | 232 ms | 2,268 ms |
+| `/use-cases` | 188 ms | 2,108 ms |
+| `/builds/service-enquiry-booking-system` | 268 ms | 2,240 ms |
+
+CLS is at most 0.0003 on all three. JS loaded at startup went from about 989 kB to 515 kB raw (about 301 kB to 161 kB gzip). These are local lab numbers, not field data.
+
+**Tests changed, and why.**
+- `rls.test.ts` now applies the full migration chain the seed targets, where it previously used a partial schema.
+- Its public-Build fixture is now approved after its Use Case link exists, which the indexing rule requires.
+- Its claim fixture now carries a domain and a work email.
+
+**Not verified.**
+- A provisioned Supabase project, mail delivery, and a real DNS lookup: the E2E test mocks the resolver.
+- A screen-reader pass.
+
 # QA record — marketplace refactor (2026-09-26)
 
 Run locally with Node 22, Vitest, PGlite and Playwright (Chromium 1194 via `CHROMIUM_EXECUTABLE_PATH`). CI (Node 24) also passed `validate` on PR #6.
