@@ -333,3 +333,6 @@
 .dns-instructions{border:1px dashed #c9bda6;border-radius:10px;padding:10px 12px;font-size:13px;background:#fffdf8}
 .dns-instructions p{margin:0 0 6px}
 .dns-instructions code{font-size:12.5px;overflow-wrap:anywhere;background:#f3eee4;padding:1px 5px;border-radius:5px}
+.compare-tray{animation:compare-tray-in .28s ease-out}
+@keyframes compare-tray-in{from{translate:0 70px;opacity:0}to{translate:0 0;opacity:1}}
+@media (prefers-reduced-motion:reduce){.compare-tray{animation:none}}

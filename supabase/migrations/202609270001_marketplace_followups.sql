@@ -183,3 +183,52 @@ end $$;
 revoke execute on function public.apply_provider_claim() from public, anon, authenticated;
 create trigger apply_provider_claim after update of status on public.provider_claims
   for each row execute function public.apply_provider_claim();
+
+-- ───────────── Unused table ─────────────
+-- Candidate explanations live on solution_candidates.explanation; this table was never written.
+drop table if exists public.solution_explanations;
+
+-- ───────────── Scheduled maintenance ─────────────
+-- Mirrors src/data/staleness.ts: evidence is due for review after 180 days and stale
+-- after 365. Attestation links expire at expiresAt; attestor contacts are deleted at
+-- deleteAfter. Run daily by pg_cron where available, or by the service role.
+create or replace function public.run_marketplace_maintenance() returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare expired integer; purged integer; refreshed integer;
+begin
+  -- In a security definer function current_user is the owner, so it cannot identify the
+  -- caller. Allowed: the service role, an administrator, or a direct database session with
+  -- no JWT at all (pg_cron). API requests always carry a JWT role (anon/authenticated).
+  if not (auth.role() = 'service_role' or public.is_admin() or auth.jwt() = '{}'::jsonb) then
+    raise exception 'Maintenance requires the service role or an administrator';
+  end if;
+  update public.attestations set status = 'expired', "updatedAt" = now()
+   where status = 'pending' and "expiresAt" <= now();
+  get diagnostics expired = row_count;
+  delete from public.attestation_contacts where "deleteAfter" <= now();
+  get diagnostics purged = row_count;
+  update public.implementation_records r
+     set "stalenessState" = s.next, "updatedAt" = now()
+    from (select id, case when "lastEvidenceReviewAt" < current_date - 365 then 'stale'
+                          when "lastEvidenceReviewAt" < current_date - 180 then 'review-due'
+                          else 'current' end as next
+            from public.implementation_records
+           where "stalenessState" <> 'archived' and visibility <> 'archived') s
+   where r.id = s.id and r."stalenessState" is distinct from s.next;
+  get diagnostics refreshed = row_count;
+  insert into public.audit_events(id,name,provenance,"actorId","entityId","entityType",action,at)
+  values(gen_random_uuid()::text,'Scheduled maintenance','verified',auth.uid(),'maintenance','system',
+         format('expired %s attestations, purged %s contacts, refreshed %s freshness states', expired, purged, refreshed), now());
+  return jsonb_build_object('expiredAttestations', expired, 'purgedContacts', purged, 'freshnessUpdated', refreshed);
+end $$;
+revoke execute on function public.run_marketplace_maintenance() from public, anon;
+grant execute on function public.run_marketplace_maintenance() to authenticated, service_role;
+
+-- Schedule it when pg_cron is enabled (Supabase: Database → Extensions → pg_cron).
+-- If pg_cron is enabled later, run the cron.schedule statement below once.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.schedule('oracnet-daily-maintenance', '17 3 * * *', 'select public.run_marketplace_maintenance()');
+  end if;
+end $$;

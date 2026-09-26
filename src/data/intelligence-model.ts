@@ -613,13 +613,6 @@ export interface SolutionCandidateItem extends IntelligenceRecord {
   alternativeProductIds: string[];
 }
 
-export interface SolutionExplanation extends IntelligenceRecord {
-  candidateId: string;
-  kind: "fit" | "risk" | "constraint" | "evidence" | "unknown";
-  text: string;
-  sourceEntityIds: string[];
-}
-
 export interface StalenessReview extends IntelligenceRecord {
   entityType: "implementation" | "blueprint" | "technology-relationship";
   entityId: string;
@@ -670,7 +663,6 @@ export interface IntelligenceTables {
   solution_runs: SolutionRun;
   solution_candidates: SolutionCandidate;
   solution_candidate_items: SolutionCandidateItem;
-  solution_explanations: SolutionExplanation;
   staleness_reviews: StalenessReview;
   implementation_fingerprints: ImplementationFingerprint;
 }

@@ -33,7 +33,6 @@ import {
   Layers3,
   Sparkles,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import { useRecords, useUI } from "../state";
 import { Modal, Logo, ButtonLink, Skeleton } from "./ui";
 const ProviderContactModal = lazy(() =>
@@ -404,14 +403,10 @@ export function CompareTray() {
   const ids = data.find((item) => item.id === "current")?.productIds ?? [];
   const location = useLocation();
   return (
-    <AnimatePresence>
+    <>
       {ids.length > 0 && !location.pathname.endsWith("compare") && (
-        <motion.div
-          className="compare-tray"
-          initial={{ y: 70, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 70, opacity: 0 }}
-        >
+        // Slides in with CSS (disabled under prefers-reduced-motion).
+        <div className="compare-tray">
           <Scale size={21} />
           <span>
             <strong>{ids.length} technologies</strong> in your comparison
@@ -420,9 +415,9 @@ export function CompareTray() {
             Compare
             <ArrowRight size={16} />
           </ButtonLink>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }
 

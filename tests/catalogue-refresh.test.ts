@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DemoRepository } from "../src/data/repository";
+import { DemoRepository } from "../src/data/demo-repository";
 import { xaiProvider } from "../src/data/vendor-xai";
 
 describe("demo catalogue refresh", () => {

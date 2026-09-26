@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DemoRepository } from "../src/data/repository";
+import { DemoRepository } from "../src/data/demo-repository";
 import { products, providers, useCases, stacks, seed } from "../src/data/seed";
 import { projectSchema } from "../src/components/forms";
 import {

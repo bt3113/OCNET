@@ -153,3 +153,28 @@ describe("Technology Vendor claims", () => {
     expect((await t.rows(`select 1 from public.audit_events where "entityId"='c1' and "entityType"='provider_claims'`)).length).toBeGreaterThan(0);
   });
 });
+
+describe("scheduled maintenance", () => {
+  it("expires links, purges contacts and refreshes evidence freshness; admin or service only", async () => {
+    await t.asOwner();
+    const record = (id: string, reviewed: string, state = "current") =>
+      `insert into public.implementation_records(id,slug,name,summary,"ownerId","publicationState",visibility,"moderationState","lastEvidenceReviewAt","stalenessState") values('${id}','${id}','Record ${id} name','A published implementation summary for testing.','${owner}','published','public','approved',${reviewed},'${state}')`;
+    await t.db.exec(record("fresh", "current_date - 10"));
+    await t.db.exec(record("due", "current_date - 200"));
+    await t.db.exec(record("old", "current_date - 400"));
+    await t.db.exec(record("kept", "current_date - 400", "archived"));
+    await t.db.exec(`insert into public.attestations(id,name,"implementationId","ownerId","tokenHash","expiresAt") values('att-old','x','fresh','${owner}','${"a".repeat(64)}',now() - interval '1 day'),('att-live','x','fresh','${owner}','${"b".repeat(64)}',now() + interval '5 days')`);
+    await t.db.exec(`insert into public.attestation_contacts("attestationId",email,"deleteAfter") values('att-old','a@example.com',now() - interval '1 day'),('att-live','b@example.com',now() + interval '20 days')`);
+    await t.as(owner);
+    await expect(t.db.exec(`select public.run_marketplace_maintenance()`)).rejects.toThrow(/service role or an administrator/);
+    await asAdmin();
+    const [{ r }] = await t.rows<{ r: Record<string, number> }>(`select public.run_marketplace_maintenance() r`);
+    expect(r.expiredAttestations).toBe(1);
+    expect(r.purgedContacts).toBe(1);
+    await t.asOwner();
+    const states = Object.fromEntries((await t.rows<{ id: string; s: string }>(`select id, "stalenessState" s from public.implementation_records where id in ('fresh','due','old','kept')`)).map((row) => [row.id, row.s]));
+    expect(states).toEqual({ fresh: "current", due: "review-due", old: "stale", kept: "archived" });
+    expect((await t.rows<{ s: string }>(`select status s from public.attestations where id='att-live'`))[0].s).toBe("pending");
+    expect(await t.rows(`select 1 from public.attestation_contacts`)).toHaveLength(1);
+  });
+});

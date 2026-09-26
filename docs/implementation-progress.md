@@ -33,7 +33,7 @@ Baseline: lint, typecheck and 32 unit tests pass. E2E needs `CHROMIUM_EXECUTABLE
 - Compiler stays a TypeScript enumerator with Pareto filtering; no solver service, no AI in ranking.
 - Custom SVG architecture map instead of a graph library.
 - Demo admin/provider workspaces stay reachable (labelled) so the demo is explorable; connected mode enforces roles in RLS.
-- Candidate explanations are stored on `solution_candidates.explanation`; the `solution_explanations` table from `202609250001` is no longer written and can be dropped in a later migration.
+- Candidate explanations are stored on `solution_candidates.explanation`; the unused `solution_explanations` table was dropped in `202609270001`.
 
 ## Audit defects (all fixed in `202609250003`, covered by `tests/security/intelligence-rls.test.ts`)
 
