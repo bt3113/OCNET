@@ -5,7 +5,7 @@ Run locally with Node 22, Vitest, PGlite and Playwright (Chromium 1194 via `CHRO
 | Check | Result |
 | --- | --- |
 | `npm run lint`, `npm run typecheck` | pass |
-| `npm test` | **175 passed** (17 files), including 64 PGlite security tests: new `seed.test.ts` (4) and `followups.test.ts` (10) |
+| `npm test` | **175 passed** (15 files), including 64 PGlite security tests: new `seed.test.ts` (4) and `followups.test.ts` (10) |
 | `npm run test:e2e` | **85 passed** |
 | `npm run build` | pass; 238 route entry points; admin routes stay out of the sitemap |
 | `npm audit --audit-level=high` | 0 vulnerabilities |
