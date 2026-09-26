@@ -19,16 +19,26 @@ const key = "oracnet:v1:";
 /** Intelligence tables use their own namespace so seed revisions do not mix with older browser data. */
 const intelligenceKey = "oracnet:intel-v4:";
 /**
- * Taxonomy v2 refreshes the vendor-source catalogue after the live xAI verification.
- * Draft/project/user tables are deliberately not reset.
+ * Taxonomy catalogue v2 refreshes source-controlled Use Cases after live vendor
+ * verification. Provider-created proposal drafts deliberately stay on v1 so a
+ * catalogue refresh does not discard user work.
  */
-const taxonomyKey = "oracnet:taxonomy-v2:";
-const taxonomyTables = new Set<Table>(["use_cases", "use_case_categories", "use_case_sources", "use_case_aliases", "use_case_proposals", "use_case_redirects"]);
-const storageKey = (table: Table) => (taxonomyTables.has(table) ? taxonomyKey : table in intelligenceSeed ? intelligenceKey : key) + table;
+const taxonomyCatalogKey = "oracnet:taxonomy-v2:";
+const taxonomyProposalKey = "oracnet:taxonomy-v1:";
+const taxonomyCatalogTables = new Set<Table>(["use_cases", "use_case_categories", "use_case_sources", "use_case_aliases", "use_case_redirects"]);
+const storageKey = (table: Table) =>
+  (taxonomyCatalogTables.has(table)
+    ? taxonomyCatalogKey
+    : table === "use_case_proposals"
+      ? taxonomyProposalKey
+      : table in intelligenceSeed
+        ? intelligenceKey
+        : key) + table;
 /** Earlier releases stored xAI's vendor statements as Builds and a creator profile; they are now Use Cases. */
 const retiredRecord = (table: Table, row: { id: string; provenance?: string }) =>
   (table === "builds" && row.id.startsWith("xai-") && row.provenance === "third-party sourced") ||
   (table === "creator_profiles" && row.id === "xai" && row.provenance === "third-party sourced");
+/** Public vendor catalogue rows are source-controlled in demo mode, not user-owned. */
 const sourcedVendorRecord = (table: Table, row: { id: string; provenance?: string }) =>
   row.provenance === "third-party sourced" &&
   ((table === "providers" && row.id === xaiProvider.id) || (table === "products" && xaiProducts.some((product) => product.id === row.id)));
