@@ -301,6 +301,8 @@ export interface Blueprint extends IntelligenceRecord {
   ownerId: string;
   description: string;
   derivedFromImplementationId?: string;
+  /** The Build this Blueprint explains ("How it works"), when it has one. */
+  buildId?: string;
   useCaseIds: string[];
   capabilityIds: string[];
   currentVersionId: string;

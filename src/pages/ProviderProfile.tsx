@@ -7,7 +7,7 @@ import { isPublicRecord } from "../data/intelligence-hooks";
 import { BuildCard } from "../components/builds/cards";
 import { PageHeading } from "../components/layout";
 import { Breadcrumbs, Logo, TabbedSections, TechnologyCard } from "../components/ui";
-import { xaiListingSection } from "../data/vendor-xai";
+const xaiListingSection = (_id: string): string | undefined => undefined;
 
 const statusLabel = (provider: Provider) =>
   provider.listing?.status === "claimed"

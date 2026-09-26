@@ -1,5 +1,6 @@
 import type { BuildTables } from "./build-model";
 import type { IntelligenceTables } from "./intelligence-model";
+import type { MarketplaceTables, SolutionProviderType, UseCaseOriginType, UseCaseStatus } from "./marketplace-model";
 export type Role =
   | "creator"
   | "buyer"
@@ -102,12 +103,25 @@ export interface ProductMedia extends RecordBase {
 }
 export interface UseCase extends RecordBase {
   slug: string;
+  /** Short definition of the work. */
   description: string;
   outcome: string;
+  /** Legacy technology category (kept for older filters). */
   category: string;
   icon: string;
   color: string;
   stackId: string;
+  /** Work category and subcategory (`use_case_categories`). */
+  categoryId?: string;
+  subcategoryId?: string;
+  /** Lifecycle. Missing is treated as approved for legacy catalogue rows. */
+  status?: UseCaseStatus;
+  originType?: UseCaseOriginType;
+  /** Vendor, Solution Provider or editorial team that introduced it. Attribution, not ownership. */
+  originEntityId?: string;
+  mergedIntoId?: string;
+  createdBy?: string;
+  updatedAt?: string;
 }
 export interface UseCaseCapability {
   useCaseId: string;
@@ -127,6 +141,7 @@ export interface StackItem {
 }
 export interface Integrator extends Provider {
   services: string[];
+  providerType?: SolutionProviderType;
 }
 export interface Consultant extends Provider {
   services: string[];
@@ -233,7 +248,7 @@ export interface WorkspaceRecord extends RecordBase {
   status?: string;
   [key: string]: unknown;
 }
-export interface Tables extends BuildTables, IntelligenceTables {
+export interface Tables extends BuildTables, IntelligenceTables, MarketplaceTables {
   users: User;
   organizations: Organization;
   providers: Provider;
