@@ -488,7 +488,7 @@ export function Layout() {
         </main>
         <footer>
           <Link className="brand footer-brand" to="/">
-            Oracnet<span>Implementation intelligence, connected.</span>
+            Oracnet<span>Use Cases, Builds and the people who deliver them.</span>
           </Link>
           <div>
             {[
