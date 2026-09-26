@@ -6,6 +6,10 @@ import { ArrowDown, ArrowUp, Check, Plus, Trash2 } from "lucide-react";
 import { useActions, useRecords, useUI } from "../state";
 import { list, save, isSupabase } from "../data/repository";
 import type { Build, BuildOffer, OfferType } from "../data/build-model";
+import type { UseCaseProposal } from "../data/marketplace-model";
+import { useMarketplace } from "../data/marketplace-hooks";
+import { buildUseCaseErrors, canPropose, isApprovedUseCase } from "../data/use-case-domain";
+import { UseCasePicker, type ProposalInput } from "../components/builds/UseCasePicker";
 import {
   completeness,
   newBuild,
@@ -24,16 +28,15 @@ import {
 } from "../components/ui";
 import { assetUrl } from "../components/builds/cards";
 import { BuildGallery } from "../components/builds/interactions";
-const steps = [
-  "Import",
-  "Details",
-  "Media",
-  "Use cases",
-  "Stack",
-  "Architecture",
-  "Implementation",
-  "Offers",
-  "Review",
+/** The Build publisher, in the order a Solution Provider thinks about a Build. */
+const steps = ["Basics", "Use Cases", "How it works", "Proof", "Service", "Review"];
+const stepTitles = [
+  "Describe the Build",
+  "Choose the work it does",
+  "Show how it works",
+  "Link real deployments",
+  "Offer a service (optional)",
+  "Review before publishing",
 ];
 export default function BuildWizard() {
   const { id } = useParams();
@@ -48,9 +51,13 @@ export default function BuildWizard() {
     useRecords("creator_profiles");
   const { data: collaborators = [] } = useRecords("build_collaborators");
   const { data: members = [] } = useRecords("organization_memberships");
+  const { data: useCases = [], isLoading: loadingUseCases } = useRecords("use_cases");
   const creator = creators.find((c) => c.ownerId === userId);
+  // "Publish a Build for this Use Case" links prefill the primary Use Case.
+  const prefill = new URLSearchParams(window.location.search).get("useCase");
+  const prefilled = useCases.find((useCase) => (useCase.id === prefill || useCase.slug === prefill) && isApprovedUseCase(useCase));
   const existing = builds.find((b) => b.id === id);
-  if (isLoading || loadingCreators) return <Skeleton />;
+  if (isLoading || loadingCreators || loadingUseCases) return <Skeleton />;
   if (isError) return <ErrorState retry={() => void refetch()} />;
   if (!userId)
     return (
@@ -99,6 +106,7 @@ export default function BuildWizard() {
       initial={
         existing ?? {
           ...newBuild(userId, creator.id),
+          useCaseIds: prefilled ? [prefilled.id] : [],
           provenance: isSupabase ? "creator supplied" : "demo",
         }
       }
@@ -110,7 +118,7 @@ function BuildEditor({ initial }: { initial: Build }) {
   const baseline = useRef(initial);
   const [step, setStep] = useState(() =>
     new URLSearchParams(window.location.search).get("stage") === "offers"
-      ? 7
+      ? 4
       : 0,
   );
   const [saveState, setSaveState] = useState("Draft ready");
@@ -120,7 +128,6 @@ function BuildEditor({ initial }: { initial: Build }) {
   const [importing, setImporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [tool, setTool] = useState("");
-  const [useCaseName, setUseCaseName] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [edgeLabel, setEdgeLabel] = useState("");
@@ -133,7 +140,14 @@ function BuildEditor({ initial }: { initial: Build }) {
   const actions = useActions();
   const navigate = useNavigate();
   const { data: products = [] } = useRecords("products");
-  const { data: cases = [] } = useRecords("use_cases");
+  const market = useMarketplace();
+  const creator = market.creators.find((item) => item.id === draft.creatorId);
+  const providerName = creator?.name ?? "";
+  const proposal = market.proposals.find((item) => item.id === draft.useCaseProposalId && item.status === "pending");
+  const ownBlueprints = market.blueprints.filter(
+    (blueprint) => blueprint.buildId === draft.id || blueprint.maintainerId === draft.creatorId || blueprint.id === draft.blueprintId,
+  );
+  const linkedRecords = market.implementations.filter((record) => record.sourceBuildId === draft.id);
   const { data: categories = [] } = useRecords("categories");
   const { data: organizations = [] } = useRecords("organizations");
   const { data: members = [] } = useRecords("organization_memberships");
@@ -175,10 +189,10 @@ function BuildEditor({ initial }: { initial: Build }) {
     }
   }
   async function publish() {
-    const problems = validateBuild(draft);
+    const problems = [...buildUseCaseErrors(draft, market.useCases), ...validateBuild(draft)];
     setErrors(problems);
     if (problems.length) {
-      setStep(8);
+      setStep(steps.length - 1);
       return;
     }
     setBusy(true);
@@ -225,6 +239,44 @@ function BuildEditor({ initial }: { initial: Build }) {
     } finally {
       setBusy(false);
     }
+  }
+  async function propose(input: ProposalInput) {
+    if (!canPropose(draft)) {
+      notify("A Build can have one proposed Use Case, within its three Use Case slots.");
+      return;
+    }
+    await saveNow();
+    const record: UseCaseProposal = {
+      id: crypto.randomUUID(),
+      name: input.suggestedTitle,
+      buildId: draft.id,
+      creatorId: draft.creatorId,
+      proposedBy: userId,
+      originalText: input.originalText,
+      suggestedTitle: input.suggestedTitle,
+      suggestedCategoryId: input.suggestedCategoryId,
+      suggestedSubcategoryId: input.suggestedSubcategoryId,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      provenance: isSupabase ? "creator supplied" : "demo",
+    };
+    try {
+      await actions.save("use_case_proposals", record);
+      update({ useCaseProposalId: record.id });
+      notify("Proposal submitted. It stays private until a moderator reviews it.");
+    } catch {
+      /* handled */
+    }
+  }
+  async function withdrawProposal() {
+    if (!draft.useCaseProposalId) return;
+    try {
+      await actions.remove("use_case_proposals", draft.useCaseProposalId);
+    } catch {
+      return;
+    }
+    update({ useCaseProposalId: undefined });
+    notify("Proposal withdrawn");
   }
   async function doImport() {
     setImporting(true);
@@ -282,7 +334,6 @@ function BuildEditor({ initial }: { initial: Build }) {
       notify(
         "Metadata imported. Review all details and confirm detected technologies.",
       );
-      setStep(1);
     } catch (e) {
       setErrors([
         e instanceof Error ? e.message : "Import failed. Continue manually.",
@@ -350,13 +401,9 @@ function BuildEditor({ initial }: { initial: Build }) {
     <>
       <WorkspaceNotice />
       <PageHeading
-        eyebrow="CREATOR STUDIO"
-        title={
-          initial.publication === "published"
-            ? "Edit your build"
-            : "Share what you’ve built."
-        }
-        description="Make the outcome, architecture and decisions useful to the next builder."
+        eyebrow="PUBLISH A BUILD"
+        title={initial.publication === "published" ? "Edit your Build" : "Publish a Build"}
+        description="A Build is a complete solution you designed or can deliver, for one to three Use Cases. Buyers see how it works, what proves it, and how to get it."
         action={
           <ButtonLink to="/creator/builds" variant="light">
             Your builds
@@ -396,21 +443,7 @@ function BuildEditor({ initial }: { initial: Build }) {
             <span role="status">{saveState}</span>
           </div>
           <div className="card form-card build-editor">
-            <h2>
-              {
-                [
-                  "Start with what exists",
-                  "Tell the story of your build",
-                  "Show it in action",
-                  "Connect it to an outcome",
-                  "Make your stack understandable",
-                  "Connect the architecture",
-                  "Share what you learned",
-                  "Attach an optional offer",
-                  "Review before publishing",
-                ][step]
-              }
-            </h2>
+            <h2>{stepTitles[step]}</h2>
             {errors.length > 0 && (
               <div className="validation-errors" role="alert">
                 <strong>Please review</strong>
@@ -423,9 +456,13 @@ function BuildEditor({ initial }: { initial: Build }) {
             )}
             {step === 0 ? (
               <>
+                <details className="publish-nested" open={!draft.name}>
+                  <summary>Import from a public repository or URL (optional)</summary>
+
                 <p>
-                  Import public repository metadata, use a project URL, or start
-                  manually. Nothing is published without your review.
+                  Import public repository metadata or a project URL to prefill
+                  this form, or skip this and fill it in below. Nothing is
+                  published without your review.
                 </p>
                 <label>
                   Import method
@@ -453,23 +490,14 @@ function BuildEditor({ initial }: { initial: Build }) {
                 >
                   {importing ? "Reading public metadata…" : "Import metadata"}
                 </button>
-                <button
-                  className="button light"
-                  onClick={() => {
-                    setErrors([]);
-                    setStep(1);
-                  }}
-                >
-                  Start manually
-                </button>
                 <p className="notice">
                   Only public repositories. No GitHub access tokens or private
                   repository scopes are requested. Detected technologies require
                   your confirmation.
                 </p>
-              </>
-            ) : step === 1 ? (
-              <>
+              
+                </details>
+
                 {field("Build name", "name")}
                 {field("Short outcome / tagline", "tagline")}
                 {field("Description", "description", true)}
@@ -535,9 +563,10 @@ function BuildEditor({ initial }: { initial: Build }) {
                       ))}
                   </select>
                 </label>
-              </>
-            ) : step === 2 ? (
-              <>
+              
+                <details className="publish-nested">
+                  <summary>Media ({draft.media.length})</summary>
+
                 <p>
                   The first image is your cover. Upload original or
                   appropriately licensed media.
@@ -636,73 +665,41 @@ function BuildEditor({ initial }: { initial: Build }) {
                   Add video link
                 </button>
                 {field("Live demo URL (optional)", "demoUrl")}
+              
+                </details>
               </>
-            ) : step === 3 ? (
+            ) : step === 1 ? (
+              <UseCasePicker
+                build={draft}
+                onChange={(useCaseIds) => update({ useCaseIds })}
+                useCases={market.useCases}
+                aliases={market.aliases}
+                categories={market.categories}
+                marketplace={market.marketplace}
+                providerName={providerName}
+                proposal={proposal}
+                onPropose={propose}
+                onWithdraw={withdrawProposal}
+              />
+            ) : step === 2 ? (
               <>
-                <p>Connect your build to the business outcome it supports.</p>
-                <div className="choice-checks">
-                  {cases.map((c) => (
-                    <label className="check-field" key={c.id}>
-                      <input
-                        type="checkbox"
-                        checked={draft.useCaseIds.includes(c.id)}
-                        onChange={(e) =>
-                          update({
-                            useCaseIds: e.target.checked
-                              ? [...draft.useCaseIds, c.id]
-                              : draft.useCaseIds.filter((i) => i !== c.id),
-                          })
-                        }
-                      />
-                      <span>
-                        <strong>{c.outcome || c.name}</strong>
-                        <small>{c.description}</small>
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                <h3>Blueprint</h3>
+                <p>
+                  A Blueprint is the reusable, versioned architecture behind this Build. Link one you maintain, or describe the stack and connections below.
+                </p>
                 <label>
-                  Suggest a new use case
-                  <input
-                    value={useCaseName}
-                    onChange={(e) => setUseCaseName(e.target.value)}
-                    maxLength={120}
-                  />
+                  Linked Blueprint
+                  <select value={draft.blueprintId ?? ""} onChange={(e) => update({ blueprintId: e.target.value || undefined })}>
+                    <option value="">No Blueprint linked</option>
+                    {ownBlueprints.map((blueprint) => (
+                      <option key={blueprint.id} value={blueprint.id}>
+                        {blueprint.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <button
-                  className="button light"
-                  onClick={async () => {
-                    if (useCaseName.trim().length < 5) {
-                      notify("Use at least five characters.");
-                      return;
-                    }
-                    const id = "usecase-" + crypto.randomUUID();
-                    try {
-                      await actions.save("use_cases", {
-                        id,
-                        slug: slugify(useCaseName),
-                        name: useCaseName,
-                        outcome: useCaseName,
-                        description:
-                          "Creator-proposed outcome; awaiting review.",
-                        category: draft.category,
-                        icon: "Sparkles",
-                        color: "sand",
-                        stackId: "",
-                        provenance: isSupabase ? "creator supplied" : "demo",
-                      });
-                      update({ useCaseIds: [...draft.useCaseIds, id] });
-                      setUseCaseName("");
-                    } catch {
-                      /* handled */
-                    }
-                  }}
-                >
-                  Add proposed use case
-                </button>
-              </>
-            ) : step === 4 ? (
-              <>
+                <h3>Stack</h3>
+
                 <label>
                   Search technology catalogue
                   <input
@@ -881,9 +878,9 @@ function BuildEditor({ initial }: { initial: Build }) {
                     </div>
                   ))}
                 </div>
-              </>
-            ) : step === 5 ? (
-              <>
+              
+                <h3>Architecture</h3>
+
                 <p>
                   Describe direction and meaning. Connections are illustrative
                   unless independently confirmed.
@@ -1007,9 +1004,9 @@ function BuildEditor({ initial }: { initial: Build }) {
                     ))}
                   </div>
                 ))}
-              </>
-            ) : step === 6 ? (
-              <>
+              
+                <h3>Delivery facts</h3>
+
                 <div className="grid two">
                   {field("Build time (creator reported)", "buildTime")}
                   {field(
@@ -1035,7 +1032,33 @@ function BuildEditor({ initial }: { initial: Build }) {
                 {field("Setup notes", "setupNotes", true)}
                 {field("Known limitations", "limitations", true)}
                 {field("Creator notes", "notes", true)}
-                {field("GitHub / source URL", "githubUrl")}
+                
+              </>
+            ) : step === 3 ? (
+              <>
+                <h3>Real deployments</h3>
+                <p>
+                  Proof is an Implementation Record: a real deployment with its context, results and evidence level. Creator notes are not proof.
+                </p>
+                {linkedRecords.length ? (
+                  <ul className="build-links">
+                    {linkedRecords.map((record) => (
+                      <li key={record.id}>
+                        <Link to={"/implementations/" + record.slug}>{record.name}</Link>{" "}
+                        <span className="muted">
+                          — {record.publicationState} · {record.moderationState}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">No Implementation Record is linked to this Build yet.</p>
+                )}
+                <Link className="button light" to={"/implementation/new?build=" + draft.id} onClick={() => void saveNow()}>
+                  <Plus size={15} /> Add a real deployment
+                </Link>
+                <h3>Source and licence</h3>
+{field("GitHub / source URL", "githubUrl")}
                 <label className="check-field">
                   <input
                     type="checkbox"
@@ -1127,8 +1150,9 @@ function BuildEditor({ initial }: { initial: Build }) {
                 >
                   Add source
                 </button>
+              
               </>
-            ) : step === 7 ? (
+            ) : step === 4 ? (
               <>
                 <p>
                   Keep the build useful on its own. Offers are optional. No card
@@ -1356,6 +1380,27 @@ function BuildEditor({ initial }: { initial: Build }) {
               </>
             ) : (
               <>
+                <h3>Use Cases</h3>
+                <ol className="review-use-cases">
+                  {draft.useCaseIds.map((useCaseId, index) => {
+                    const useCase = market.useCases.find((item) => item.id === useCaseId);
+                    return (
+                      <li key={useCaseId}>
+                        <strong>{useCase?.name ?? "Removed Use Case"}</strong> <span className="muted">{index === 0 ? "Primary" : "Secondary"}</span>
+                      </li>
+                    );
+                  })}
+                  {proposal && (
+                    <li>
+                      <strong>{proposal.suggestedTitle}</strong> <span className="muted">Proposed · pending review</span>
+                    </li>
+                  )}
+                </ol>
+                {!draft.useCaseIds.length && (
+                  <button type="button" className="text-button" onClick={() => setStep(1)}>
+                    Choose a Use Case
+                  </button>
+                )}
                 <Badge>
                   Public-page preview ·{" "}
                   {draft.visibility === "draft" ? "public" : draft.visibility}
@@ -1407,7 +1452,7 @@ function BuildEditor({ initial }: { initial: Build }) {
                 >
                   Back
                 </button>
-                {step < 8 ? (
+                {step < steps.length - 1 ? (
                   <button
                     className="button dark"
                     onClick={() => {

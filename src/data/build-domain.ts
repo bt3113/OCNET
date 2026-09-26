@@ -36,7 +36,7 @@ export const buildSchema = z.object({
   description: z.string().trim().min(40).max(12000),
   creatorId: z.string().min(1),
   category: z.string().min(1),
-  useCaseIds: z.array(z.string()).min(1),
+  useCaseIds: z.array(z.string()).max(3), // min 1 incl. a proposal: see buildUseCaseErrors
   stack: z
     .array(
       z.object({

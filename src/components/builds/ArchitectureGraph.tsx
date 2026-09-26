@@ -219,7 +219,7 @@ export default function ArchitectureGraph({ build }: { build: Build }) {
               <p>{item.notes}</p>
               <Link to={"/technologies/" + p.slug}>View technology →</Link>
               {provider && (
-                <Link to={"/providers/" + provider.slug}>
+                <Link to={"/technology-vendors/" + provider.slug}>
                   Provider: {provider.name} →
                 </Link>
               )}

@@ -18,12 +18,11 @@ import {
   integrators,
   consultants,
   articles,
+  seed,
 } from "../src/data/seed.ts";
-import { builds as demoBuilds, creators as demoCreators } from "../src/data/build-seed.ts";
-import { xaiBuilds, xaiCreator } from "../src/data/vendor-xai.ts";
-const builds = [...demoBuilds, ...xaiBuilds];
-const creators = [...demoCreators, xaiCreator];
 import { implementationRecords, blueprints } from "../src/data/intelligence-seed.ts";
+import { solutionProviders } from "../src/data/solution-providers.ts";
+import { isApprovedUseCase, isIndexableBuild } from "../src/data/use-case-domain.ts";
 // Only public, approved records get static pages, metadata and sitemap entries.
 // Private customer identity never appears here: descriptions use the public summary.
 const publicImplementations = implementationRecords.filter(
@@ -32,19 +31,25 @@ const publicImplementations = implementationRecords.filter(
 const publicBlueprints = blueprints.filter(
   (blueprint) => blueprint.publicationState === "published" && blueprint.moderationState === "approved",
 );
+// Pending, merged, archived and rejected Use Cases stay out of the sitemap, and so do
+// Builds whose only Use Case is an unmoderated proposal.
+const allUseCases = seed.use_cases ?? useCases;
+const approvedUseCases = allUseCases.filter(isApprovedUseCase);
+const indexableBuilds = (seed.builds ?? []).filter((build) => isIndexableBuild(build, allUseCases));
+const providerProfiles = solutionProviders(seed.creator_profiles ?? [], integrators, consultants).map((provider) => ({
+  ...provider,
+  description: provider.headline,
+}));
 const entities = [
   ["implementations", publicImplementations],
   ["blueprints", publicBlueprints],
-  ["implementers", integrators],
-  ["builds", builds],
-  ["creators", creators],
+  ["use-cases", approvedUseCases],
+  ["builds", indexableBuilds],
+  ["solution-providers", providerProfiles],
   ["technologies", products],
-  ["providers", providers],
-  ["use-cases", useCases],
+  ["technology-vendors", providers],
   ["solution-stacks", stacks],
   ["categories", categories],
-  ["integrators", integrators],
-  ["consultants", consultants],
   ["resources", articles],
   ["updates", articles],
 ].flatMap(([type, records]) =>
@@ -82,13 +87,13 @@ for (const route of routes) {
   const name =
     entity?.name ??
     (route === "/"
-      ? "Implementation intelligence for what you want to improve"
+      ? "Use Cases, Builds and Solution Providers for the work you need done"
       : route.split("/").at(-1).replaceAll("-", " "));
   const description =
     entity?.description ??
     "Explore " +
       name +
-      " on Oracnet — implementation evidence, reusable Blueprints, technologies and implementation partners around a business outcome.";
+      " on Oracnet — Use Cases, Builds, Solution Providers, technologies and implementation evidence.";
   const canonical = "https://bt3113.github.io/OCNET" + route;
   const privatePage =
     /^\/(app|admin|provider\b|creator\b|collections\b|verify\b|implementation\/new|sign-|forgot|onboarding)/.test(

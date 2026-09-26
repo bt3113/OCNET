@@ -24,6 +24,7 @@ const BuildDetail = lazy(() => import("./pages/BuildDetail"));
 const Collections = lazy(() => import("./pages/Collections"));
 const BuildWorkspace = lazy(() => import("./pages/BuildWorkspace"));
 const BuildWizard = lazy(() => import("./pages/BuildWizard"));
+const UseCaseModeration = lazy(() => import("./pages/UseCaseModeration"));
 const Home = lazy(() => import("./pages/Home"));
 const Discovery = lazy(() => import("./pages/Discovery"));
 const Details = lazy(() => import("./pages/Details"));
@@ -83,7 +84,7 @@ function SEO() {
     const path = location.pathname;
     const name =
       path === "/"
-        ? "Implementation intelligence for what you want to improve"
+        ? "Use Cases, Builds and Solution Providers for the work you need done"
         : decodeURIComponent(
             path.split("/").filter(Boolean).at(-1) ?? "Discover",
           ).replaceAll("-", " ");
@@ -93,7 +94,7 @@ function SEO() {
       ? `Explore the implementation context, architecture, evidence and reusable options for ${name} on Oracnet.`
       : path.startsWith("/blueprints/")
         ? `Explore the sanitized, versioned reference Blueprint ${name} on Oracnet.`
-        : "Explore implementation evidence, reusable Blueprints, technologies and qualified partners around a business outcome on Oracnet.";
+        : "Find Use Cases, Builds, Solution Providers, technologies and implementation evidence on Oracnet.";
     const canonical =
       "https://bt3113.github.io/OCNET" + (path === "/" ? "/" : path);
     let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
@@ -249,6 +250,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     {["implementers", "integrators", "consultants", "creators", "providers"].map((p) => (
                       <Route key={p + "-slug"} path={p + "/:slug"} element={<LegacyRedirect />} />
                     ))}
+                    <Route path="admin/use-cases" element={<UseCaseModeration />} />
                     <Route path="search" element={<SearchPage />} />
                     {["builds", "explore"].map((p) => (
                       <Route key={p} path={p} element={<BuildDiscovery />} />
@@ -288,6 +290,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       .filter(
                         (p) =>
                           p !== "/app/compare" &&
+                          p !== "/admin/use-cases" &&
                           !intelligenceWorkspaceRoutes.has(p),
                       )
                       .map((p) => (

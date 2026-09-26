@@ -1,4 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { useSolutionProviders } from "../data/marketplace-hooks";
+import { providerForImplementer } from "../data/solution-providers";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, CalendarDays, CircleDollarSign, Download, FileKey2, GitBranch, MessageSquare, Send, Users, Wrench } from "lucide-react";
 import { PageHeading } from "../components/layout";
@@ -18,7 +20,7 @@ import {
   StalenessBadge,
   implementationCostLabel,
 } from "../components/intelligence";
-import { useActions, useUI } from "../state";
+import { useActions, useRecords, useUI } from "../state";
 import { implementationBundle, isPublicRecord, provBundle, useIntelligence } from "../data/intelligence-hooks";
 import { implementationFreshness, blueprintFreshness } from "../data/staleness";
 import { evidenceCoverage } from "../data/evidence";
@@ -42,6 +44,8 @@ export default function ImplementationDetail() {
   const actions = useActions();
   const { userId, notify, setContact } = useUI();
   const data = useIntelligence();
+  const solutionProviderList = useSolutionProviders();
+  const { data: allBuilds = [] } = useRecords("builds");
   const [metric, setMetric] = useState<ImplementationMetric | null>(null);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
@@ -71,6 +75,7 @@ export default function ImplementationDetail() {
   const freshness = implementationFreshness(record, now);
   const useCases = data.useCases.filter((useCase) => bundle.useCaseIds.includes(useCase.id));
   const implementers = data.implementers.filter((partner) => record.implementerIds.includes(partner.id));
+  const sourceBuild = allBuilds.find((build) => build.id === record.sourceBuildId && build.visibility === "public" && build.publication === "published");
   const derived = data.blueprints.filter((blueprint) => record.derivedBlueprintIds.includes(blueprint.id) && blueprint.publicationState === "published" && blueprint.moderationState === "approved");
   const coverage = evidenceCoverage(bundle.claims.filter((claim) => claim.public));
   const timeline = provenanceTimeline(provBundle(bundle));
@@ -362,7 +367,8 @@ export default function ImplementationDetail() {
             <div><dt>Region</dt><dd>{record.region}</dd></div>
             <div><dt>Went live</dt><dd>{record.goLiveDate ?? "Not disclosed"}</dd></div>
             <div><dt>Setup cost</dt><dd>{implementationCostLabel(record)}</dd></div>
-            <div><dt>Implementer</dt><dd>{implementers.map((partner) => <Link key={partner.id} to={`/implementers/${partner.slug}`}>{partner.name}</Link>)}{!implementers.length && "Not recorded"}</dd></div>
+            {sourceBuild && <div><dt>Build used</dt><dd><Link to={`/builds/${sourceBuild.slug}`}>{sourceBuild.name}</Link></dd></div>}
+            <div><dt>Solution Provider</dt><dd>{implementers.map((partner) => <Link key={partner.id} to={providerForImplementer(solutionProviderList, partner.id) ? `/solution-providers/${providerForImplementer(solutionProviderList, partner.id)!.slug}` : `/implementers/${partner.slug}`}>{partner.name}</Link>)}{!implementers.length && "Not recorded"}</dd></div>
           </dl>
         </div>
         <aside className="implementation-hero-actions card">

@@ -226,7 +226,7 @@ export default function Details() {
                   <dd>Contact providers</dd>
                 </div>
               </dl>
-              <ButtonLink to="/integrators" variant="light">
+              <ButtonLink to="/solution-providers" variant="light">
                 Find an implementation partner
                 <ArrowRight size={16} />
               </ButtonLink>

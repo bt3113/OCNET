@@ -225,7 +225,7 @@ export function CreatorCard({ creator }: { creator: CreatorProfile }) {
         <Badge>{creator.provenance}</Badge>
       </div>
       <h3>
-        <Link to={"/creators/" + creator.slug}>{creator.name}</Link>
+        <Link to={"/solution-providers/" + creator.slug}>{creator.name}</Link>
       </h3>
       <p>{creator.headline}</p>
       <div className="tags">
@@ -241,7 +241,7 @@ export function CreatorCard({ creator }: { creator: CreatorProfile }) {
         <Link
           className="icon-button"
           aria-label={"View " + creator.name}
-          to={"/creators/" + creator.slug}
+          to={"/solution-providers/" + creator.slug}
         >
           <ArrowRight size={18} />
         </Link>

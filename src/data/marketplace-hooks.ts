@@ -67,3 +67,11 @@ export function useMarketplace() {
   return { ...data, marketplace, isLoading, isError, refetch: () => values.forEach((query) => void query.refetch()) };
 }
 export type MarketplaceState = ReturnType<typeof useMarketplace>;
+
+/** Solution Provider profiles only, for pages that just need to link to them. */
+export function useSolutionProviders() {
+  const creators = useRecords("creator_profiles").data;
+  const integrators = useRecords("integrators").data;
+  const consultants = useRecords("consultants").data;
+  return useMemo(() => solutionProviders(creators ?? [], integrators ?? [], consultants ?? []), [creators, integrators, consultants]);
+}
