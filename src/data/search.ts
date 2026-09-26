@@ -18,18 +18,23 @@ import type {
 import { capabilityLabel } from "./taxonomy";
 import { evidenceLevelInfo } from "./evidence";
 import { rightsCatalogue } from "./rights";
-import { isPublicBuild, completeness } from "./build-domain";
+import { completeness } from "./build-domain";
+import type { UseCaseAlias, UseCaseCategory, UseCaseSource } from "./marketplace-model";
+import { isApprovedUseCase, isIndexableBuild } from "./use-case-domain";
+import { solutionProviders } from "./solution-providers";
 export type SearchType =
-  | "Implementation"
-  | "Blueprint"
+  | "Use Case"
   | "Build"
   | "Technology"
-  | "Use case"
-  | "Creator"
-  | "Provider"
-  | "Implementer"
+  | "Solution Provider"
+  | "Implementation"
+  | "Blueprint"
+  | "Technology Vendor"
   | "Stack"
   | "Resource";
+/** Primary result types lead; secondary ones follow. */
+export const primarySearchTypes: SearchType[] = ["Use Case", "Build", "Technology", "Solution Provider"];
+export const secondarySearchTypes: SearchType[] = ["Implementation", "Blueprint", "Technology Vendor", "Resource"];
 export interface SearchDocument {
   id: string;
   name: string;
@@ -59,6 +64,10 @@ export interface SearchCatalogue {
   cases: UseCase[];
   stacks: SolutionStack[];
   articles: Article[];
+  aliases?: UseCaseAlias[];
+  categories?: UseCaseCategory[];
+  useCaseSources?: UseCaseSource[];
+  consultants?: Provider[];
 }
 export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
   const implementations = c.implementations ?? [];
@@ -143,7 +152,7 @@ export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
         completeness: 75,
         provenance: blueprint.provenance,
       })),
-    ...c.builds.filter(isPublicBuild).map((build) => ({
+    ...c.builds.filter((build) => isIndexableBuild(build, c.cases)).map((build) => ({
       id: build.id,
       name: build.name,
       description: build.tagline,
@@ -179,49 +188,42 @@ export function searchDocuments(c: SearchCatalogue): SearchDocument[] {
       completeness: 50,
       provenance: product.provenance,
     })),
-    ...c.cases.map((useCase) => ({
+    // Use Cases are searchable by every label, including hidden search labels (typos,
+    // jargon). Only the preferred title is ever displayed.
+    ...c.cases.filter(isApprovedUseCase).map((useCase) => ({
       id: useCase.id,
       name: useCase.name,
       description: useCase.description,
-      text: useCase.outcome,
-      type: "Use case" as const,
+      text: [
+        useCase.outcome,
+        ...(c.aliases ?? []).filter((alias) => alias.useCaseId === useCase.id).map((alias) => alias.label),
+        ...(c.categories ?? []).filter((category) => category.id === useCase.categoryId || category.id === useCase.subcategoryId).map((category) => category.name),
+        ...(c.useCaseSources ?? [])
+          .filter((source) => source.useCaseId === useCase.id)
+          .flatMap((source) => [source.originalDescription, ...source.productIds.map((id) => c.products.find((product) => product.id === id)?.name ?? "")]),
+      ].join(" "),
+      type: "Use Case" as const,
       path: "/use-cases/" + useCase.slug,
-      completeness: 50,
+      completeness: 60,
       provenance: useCase.provenance,
     })),
-    ...c.creators.map((creator) => ({
-      id: creator.id,
-      name: creator.name,
-      description: creator.headline,
-      text: [
-        creator.bio,
-        ...creator.expertise,
-        ...creator.technologyIds.map(
-          (id) => c.products.find((product) => product.id === id)?.name ?? "",
-        ),
-      ].join(" "),
-      type: "Creator" as const,
-      path: "/creators/" + creator.slug,
-      completeness: 50,
-      provenance: creator.provenance,
-    })),
-    ...c.providers.map((provider) => ({
-      id: provider.id,
+    ...solutionProviders(c.creators, implementers, c.consultants ?? []).map((provider) => ({
+      id: `solution-provider-${provider.id}`,
       name: provider.name,
-      description: provider.description,
-      text: provider.specialties.join(" "),
-      type: "Provider" as const,
-      path: "/providers/" + provider.slug,
+      description: provider.headline,
+      text: [provider.type, provider.region, provider.description].join(" "),
+      type: "Solution Provider" as const,
+      path: "/solution-providers/" + provider.slug,
       completeness: 50,
       provenance: provider.provenance,
     })),
-    ...implementers.map((provider) => ({
-      id: `implementer-${provider.id}`,
+    ...c.providers.map((provider) => ({
+      id: `vendor-${provider.id}`,
       name: provider.name,
-      description: provider.description,
-      text: [provider.region, ...provider.specialties].join(" "),
-      type: "Implementer" as const,
-      path: "/integrators/" + provider.slug,
+      description: provider.listing?.tagline ?? provider.description,
+      text: [provider.description, ...provider.specialties, ...c.products.filter((product) => product.providerId === provider.id).map((product) => product.name)].join(" "),
+      type: "Technology Vendor" as const,
+      path: "/technology-vendors/" + provider.slug,
       completeness: 50,
       provenance: provider.provenance,
     })),
@@ -286,8 +288,10 @@ const typeWords: Record<string, SearchType> = {
   blueprints: "Blueprint",
   technology: "Technology",
   technologies: "Technology",
-  implementer: "Implementer",
-  implementers: "Implementer",
+  provider: "Solution Provider",
+  providers: "Solution Provider",
+  vendor: "Technology Vendor",
+  vendors: "Technology Vendor",
 };
 
 const tokenize = (text: string) => (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).map(stem);

@@ -20,7 +20,6 @@ import "./intelligence.css";
 import "./structure.css";
 const BuildDiscovery = lazy(() => import("./pages/BuildDiscovery"));
 const BuildDetail = lazy(() => import("./pages/BuildDetail"));
-const Creators = lazy(() => import("./pages/Creators"));
 const Collections = lazy(() => import("./pages/Collections"));
 const BuildWorkspace = lazy(() => import("./pages/BuildWorkspace"));
 const BuildWizard = lazy(() => import("./pages/BuildWizard"));
@@ -44,13 +43,13 @@ const ImplementationWizard = lazy(
 const Blueprints = lazy(() => import("./pages/Blueprints"));
 const SearchPage = lazy(() => import("./pages/Search"));
 const SolutionCompiler = lazy(() => import("./pages/SolutionCompiler"));
-const UseCaseIntelligenceDetail = lazy(
-  () => import("./pages/UseCaseIntelligenceDetail"),
-);
+const UseCases = lazy(() => import("./pages/UseCases"));
+const SolutionProviders = lazy(() => import("./pages/SolutionProviders"));
+const TechnologyVendors = lazy(() => import("./pages/TechnologyVendors"));
+const LegacyRedirect = lazy(() => import("./pages/LegacyRedirect"));
 const TechnologyIntelligenceDetail = lazy(
   () => import("./pages/TechnologyIntelligenceDetail"),
 );
-const Implementers = lazy(() => import("./pages/Implementers"));
 const Verification = lazy(() => import("./pages/Verification"));
 const IntelligenceWorkspace = lazy(
   () => import("./pages/IntelligenceWorkspace"),
@@ -236,15 +235,24 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="solution-compiler" element={<SolutionCompiler />} />
                     <Route path="implementation/new" element={<ImplementationWizard />} />
                     <Route path="verify/:token" element={<Verification />} />
-                    <Route path="implementers" element={<Implementers />} />
-                    <Route path="implementers/:slug" element={<Implementers />} />
+                    <Route path="use-cases" element={<UseCases />} />
+                    <Route path="use-cases/:slug" element={<UseCases />} />
+                    <Route path="solution-providers" element={<SolutionProviders />} />
+                    <Route path="solution-providers/:slug" element={<SolutionProviders />} />
+                    <Route path="technology-vendors" element={<TechnologyVendors />} />
+                    <Route path="technology-vendors/:slug" element={<TechnologyVendors />} />
+                    {/* Legacy people/company routes resolve to the two public concepts. */}
+                    {["implementers", "integrators", "consultants", "creators", "providers"].map((p) => (
+                      <Route key={p} path={p} element={<LegacyRedirect />} />
+                    ))}
+                    {["implementers", "integrators", "consultants", "creators", "providers"].map((p) => (
+                      <Route key={p + "-slug"} path={p + "/:slug"} element={<LegacyRedirect />} />
+                    ))}
                     <Route path="search" element={<SearchPage />} />
                     {["builds", "explore"].map((p) => (
                       <Route key={p} path={p} element={<BuildDiscovery />} />
                     ))}
                     <Route path="builds/:slug" element={<BuildDetail />} />
-                    <Route path="creators" element={<Creators />} />
-                    <Route path="creators/:slug" element={<Creators />} />
                     <Route path="collections" element={<Collections />} />
                     <Route path="collections/:slug" element={<Collections />} />
                     <Route path="creator/builds/new" element={<BuildWizard />} />
@@ -265,27 +273,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     ].map((p) => (
                       <Route key={p} path={p} element={<BuildWorkspace />} />
                     ))}
-                    {[
-                      "use-cases",
-                      "solution-stacks",
-                      "technologies",
-                      "categories",
-                      "providers",
-                      "integrators",
-                      "consultants",
-                      "marketplace",
-                    ].map((p) => (
+                    {["solution-stacks", "technologies", "categories", "marketplace"].map((p) => (
                       <Route key={p} path={p} element={<Discovery />} />
                     ))}
-                    <Route path="use-cases/:slug" element={<UseCaseIntelligenceDetail />} />
                     <Route path="technologies/:slug" element={<TechnologyIntelligenceDetail />} />
-                    {[
-                      "solution-stacks",
-                      "categories",
-                      "providers",
-                      "integrators",
-                      "consultants",
-                    ].map((p) => (
+                    {["solution-stacks", "categories"].map((p) => (
                       <Route key={p} path={p + "/:slug"} element={<Details />} />
                     ))}
                     {["compare", "app/compare"].map((p) => (

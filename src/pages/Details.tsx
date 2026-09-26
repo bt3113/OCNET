@@ -5,7 +5,6 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowRight, ExternalLink, ShieldCheck } from "lucide-react";
 import { useRecords, useActions, useUI } from "../state";
 import { PageHeading } from "../components/layout";
-import { ProviderProfile } from "./ProviderProfile";
 import {
   Breadcrumbs,
   Badge,
@@ -69,7 +68,6 @@ export default function Details() {
           : type === "categories"
             ? category
             : provider;
-  if (type === "providers" && provider) return <ProviderProfile provider={provider} />;
   if (!item)
     return (
       <EmptyState

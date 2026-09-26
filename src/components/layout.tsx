@@ -13,7 +13,6 @@ import {
   LayoutGrid,
   Cpu,
   Users,
-  ShoppingBag,
   BookOpen,
   MessageSquare,
   Bookmark,
@@ -45,19 +44,16 @@ import { isSupabase } from "../data/repository";
 type NavItem = readonly [string, string, typeof Home];
 const primaryLinks: readonly NavItem[] = [
   ["/", "Home", Home],
-  ["/solution-compiler", "Find a solution", Sparkles],
-  ["/implementations", "Implementations", LayoutGrid],
-  ["/blueprints", "Blueprints", Layers3],
+  ["/use-cases", "Use Cases", GitBranch],
+  ["/builds", "Builds", LayoutGrid],
   ["/technologies", "Technologies", Cpu],
-  ["/implementers", "Implementers", Users],
+  ["/solution-providers", "Solution Providers", Users],
 ];
 const browseLinks: readonly NavItem[] = [
-  ["/use-cases", "Use Cases", GitBranch],
-  ["/providers", "Providers", Building2],
-  ["/builds", "Builds", LayoutGrid],
-  ["/marketplace", "Marketplace", ShoppingBag],
+  ["/implementations", "Implementations", ShieldCheck],
+  ["/blueprints", "Blueprints", Layers3],
+  ["/technology-vendors", "Technology Vendors", Building2],
   ["/resources", "Resources", BookOpen],
-  ["/explore", "Explore", Search],
 ];
 const buyerLinks: readonly NavItem[] = [
   ["/app/saved", "Saved", Bookmark],
@@ -180,6 +176,10 @@ export function AppSidebar({ close }: { close: () => void }) {
                 {label}
               </NavLink>
             ))}
+            <NavLink className="nav-find-solution" to="/solution-compiler" onClick={close}>
+              <Sparkles size={17} strokeWidth={1.65} />
+              Find a solution
+            </NavLink>
             <NavGroup title="Browse more" links={browseLinks} close={close} />
             <NavGroup title="Your workspace" links={buyerLinks} close={close} />
           </>
@@ -237,17 +237,17 @@ function NavGroup({ title, links, close }: { title: string; links: readonly NavI
 export function MobileNavigation({ onMenu }: { onMenu: () => void }) {
   return (
     <nav className="mobile-nav" aria-label="Mobile navigation">
-      <NavLink to="/explore">
-        <Search size={21} />
-        Explore
+      <NavLink to="/use-cases">
+        <GitBranch size={21} />
+        Use Cases
       </NavLink>
-      <NavLink to="/implementations">
+      <NavLink to="/builds">
         <LayoutGrid size={21} />
-        Records
+        Builds
       </NavLink>
-      <NavLink to="/solution-compiler" className="mobile-publish">
-        <Sparkles size={21} />
-        Find
+      <NavLink to="/solution-providers">
+        <Users size={21} />
+        Providers
       </NavLink>
       <NavLink to="/app/saved">
         <Bookmark size={21} />
@@ -266,7 +266,7 @@ export function GlobalSearch() {
   return (
     <button className="global-search" onClick={() => setCommand(true)}>
       <Search size={19} />
-      <span>Search implementations, Blueprints, use cases, technologies…</span>
+      <span>Search Use Cases, Builds, technologies, providers…</span>
       <kbd>⌘ K</kbd>
     </button>
   );
@@ -447,7 +447,7 @@ export function Layout() {
       <div className="app-shell">
         {!isSupabase && (
           <p className="demo-strip" role="note">
-            <strong>Demo</strong> Sample records, Blueprints, implementers and outcomes are illustrative — none describes a real customer or result. Provider use-case listings summarise public pages and link their source.
+            <strong>Demo</strong> Sample Builds, Solution Providers, deployments and outcomes are illustrative — none describes a real customer or result. Vendor-stated Use Cases summarise public vendor pages and link their source.
           </p>
         )}
         <header className="topbar">
@@ -468,9 +468,9 @@ export function Layout() {
               <Bell size={20} />
               {notifications.some((notification) => !notification.read) && <i />}
             </Link>
-            <ButtonLink to="/implementation/new" variant="gold">
+            <ButtonLink to="/creator/builds/new" variant="gold">
               <Plus size={18} />
-              <span>Add Implementation</span>
+              <span>Publish a Build</span>
             </ButtonLink>
             <button
               className="avatar account-button"
