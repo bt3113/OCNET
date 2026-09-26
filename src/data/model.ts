@@ -41,6 +41,22 @@ export interface Category extends RecordBase {
 export interface Capability extends RecordBase {
   description: string;
 }
+/**
+ * How a company's profile reached Oracnet. "unclaimed" profiles are compiled by
+ * Oracnet from the company's public pages; only a claimed profile is maintained
+ * by the company itself.
+ */
+export interface ProviderListing {
+  status: "unclaimed" | "claimed";
+  compiledBy: string;
+  /** ISO date the public sources were last read. */
+  sourcedAt: string;
+  sources: { label: string; url: string }[];
+  tagline: string;
+  about: string;
+  /** Anything a buyer should know about naming or branding on the sources. */
+  note?: string;
+}
 export interface Provider extends RecordBase {
   slug: string;
   description: string;
@@ -50,6 +66,7 @@ export interface Provider extends RecordBase {
   website: string;
   region: string;
   specialties: string[];
+  listing?: ProviderListing;
 }
 export interface Product extends RecordBase {
   slug: string;
@@ -74,6 +91,8 @@ export interface Product extends RecordBase {
   operatorSkill?: "no-code" | "low-code" | "developer";
   /** Provenance of the attributes above when they differ from the record provenance. */
   attributeSource?: string;
+  /** Public page the description was taken from. */
+  sourceUrl?: string;
 }
 export interface ProductMedia extends RecordBase {
   productId: string;

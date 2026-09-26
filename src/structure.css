@@ -108,3 +108,29 @@
   .how-steps li{padding:12px}
   .requirement-summary-list{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* Provider profiles and provider use-case listings */
+.provider-title{gap:14px;align-items:flex-start}
+.provider-title .logo-tile{flex:0 0 auto;margin-top:26px}
+.provider-listing-note{display:block;margin:14px 0 0;padding:10px 14px;border-radius:12px;background:#f6ecd4;color:#4d412d;font-size:12.5px;line-height:1.5;max-width:760px}
+.provider-listing-note svg{vertical-align:-3px;margin-right:6px}
+.provider-listing-note a{text-decoration:underline}
+.provider-evidence-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:0 0 16px}
+.provider-evidence-facts div{padding:14px 16px;border-radius:14px;background:#fffefa;border:1px solid var(--line)}
+.provider-evidence-facts dt{font-size:11.5px;color:#655a57}
+.provider-evidence-facts dd{margin:4px 0 0;font-size:20px;font-weight:650}
+.provider-sources{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:8px}
+.provider-sources a{font-weight:600;display:inline-flex;gap:5px;align-items:center}
+.provider-sources .muted{font-size:12px;overflow-wrap:anywhere}
+.provider-lifecycle{list-style:none;margin:0 0 16px;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.provider-lifecycle li{display:grid;gap:4px;padding:14px;border-radius:14px;border:1px solid var(--line);background:#fffefa;font-size:12.5px;color:#655a57}
+.provider-lifecycle li strong{color:#1f1a17;font-size:13.5px}
+.provider-lifecycle li.current{border-color:#1f1a17}
+.provider-about .lead-text{max-width:780px}
+@media (max-width:767px){.provider-lifecycle{grid-template-columns:1fr}.provider-title .logo-tile{margin-top:4px}}
+.provider-listing-cover{height:100%;min-height:170px;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding:18px 20px;background:radial-gradient(120% 90% at 100% 0%,#3a322c 0%,#1f1a17 60%);color:#f8f4ea}
+.provider-listing-cover span{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#d9cfbd}
+.provider-listing-cover strong{font-size:19px;line-height:1.2;letter-spacing:-.02em;font-weight:650}
+.provider-listing-cover small{font-size:12px;color:#c9bea9}
+.provider-listing-cover.large{height:auto;min-height:240px;max-height:320px;border-radius:18px;padding:28px}
+.provider-listing-cover.large strong{font-size:30px}

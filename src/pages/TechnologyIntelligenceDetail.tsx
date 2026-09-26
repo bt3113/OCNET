@@ -25,7 +25,7 @@ import {
 } from "../components/intelligence";
 import { isPublicRecord } from "../data/intelligence-hooks";
 import { relationshipFreshness } from "../data/staleness";
-import { isPublicBuild } from "../data/build-domain";
+import { isProviderListing, isPublicBuild } from "../data/build-domain";
 import { ProductMediaList } from "../components/media";
 import { useActions, useRecords, useUI } from "../state";
 
@@ -96,6 +96,8 @@ export default function TechnologyIntelligenceDetail() {
   );
   const alternatives = products.filter((candidate) => alternativeIds.has(candidate.id));
   const relatedBuilds = builds.filter((build) => isPublicBuild(build) && build.stack.some((item) => item.productId === product.id));
+  const providerListings = relatedBuilds.filter(isProviderListing);
+  const creatorBuilds = relatedBuilds.filter((build) => !isProviderListing(build));
   return (
     <>
       <Breadcrumbs
@@ -110,6 +112,11 @@ export default function TechnologyIntelligenceDetail() {
           <div>
             <Badge>TECHNOLOGY COMPONENT</Badge>
             <PageHeading title={product.name} description={product.description} />
+            {product.sourceUrl && (
+              <p className="muted small-print">
+                Summarised from the provider’s <a href={product.sourceUrl} target="_blank" rel="noopener noreferrer">public page</a> · not confirmed by the provider
+              </p>
+            )}
             <div className="row wrap">
               <SaveButton id={product.id} name={product.name} />
               <CompareButton product={product} />
@@ -333,10 +340,16 @@ export default function TechnologyIntelligenceDetail() {
             </section>
           )}
 
-          {!!relatedBuilds.length && (
+          {!!providerListings.length && (
+            <section className="intelligence-section">
+              <SectionIntro eyebrow="PROVIDER USE CASES" title={`What ${provider?.name ?? "the provider"} lists it for`}>The provider’s own use-case descriptions, summarised with a link to the source. They are not deployment evidence.</SectionIntro>
+              <ul className="build-links">{providerListings.map((build) => <li key={build.id}><Link to={`/builds/${build.slug}`}>{build.name}</Link> <span className="muted">— {build.tagline}</span></li>)}</ul>
+            </section>
+          )}
+          {!!creatorBuilds.length && (
             <section className="intelligence-section">
               <SectionIntro eyebrow="BUILDS" title="Creator projects using it">Builds are creator showcases, not deployment evidence.</SectionIntro>
-              <ul className="build-links">{relatedBuilds.map((build) => <li key={build.id}><Link to={`/builds/${build.slug}`}>{build.name}</Link> <span className="muted">— {build.tagline}</span></li>)}</ul>
+              <ul className="build-links">{creatorBuilds.map((build) => <li key={build.id}><Link to={`/builds/${build.slug}`}>{build.name}</Link> <span className="muted">— {build.tagline}</span></li>)}</ul>
             </section>
           )}
 

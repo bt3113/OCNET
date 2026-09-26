@@ -1,3 +1,11 @@
+import {
+  xaiBuilds,
+  xaiCreator,
+  xaiProducts,
+  xaiProvider,
+  xaiRelatedStacks,
+  xaiRelatedUseCases,
+} from "./vendor-xai.ts";
 import { buildSeed, buildProducts, buildProviders } from "./build-seed.ts";
 import {
   intelligenceProducts,
@@ -547,13 +555,17 @@ export const articles = [
     provenance: "demo" as const,
   },
 ];
-providers.push(...buildProviders, ...intelligenceProviders);
-products.push(...buildProducts, ...intelligenceProducts);
+providers.push(...buildProviders, ...intelligenceProviders, xaiProvider);
+products.push(...buildProducts, ...intelligenceProducts, ...xaiProducts);
 for (const product of products) Object.assign(product, productAttributeOverrides[product.id] ?? {});
 useCases.unshift(...intelligenceUseCases);
+useCases.push(...xaiRelatedUseCases);
 stacks.unshift(...intelligenceStacks);
+stacks.push(...xaiRelatedStacks);
 export const seed: Partial<{ [K in Table]: Tables[K][] }> = {
   ...buildSeed,
+  builds: [...(buildSeed.builds ?? []), ...xaiBuilds],
+  creator_profiles: [...(buildSeed.creator_profiles ?? []), xaiCreator],
   organizations: [
     {
       id: "northstar",

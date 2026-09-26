@@ -28,6 +28,8 @@ import {
   Box,
   ChartNoAxesColumn,
   ExternalLink,
+  FileText,
+  Globe,
 } from "lucide-react";
 import type {
   Product,
@@ -52,6 +54,8 @@ export const icons = {
   ShoppingBag,
   Box,
   ChartNoAxesColumn,
+  FileText,
+  Globe,
 };
 export function Icon({ name, size = 23 }: { name: string; size?: number }) {
   const C = icons[name as keyof typeof icons] || Sparkles;

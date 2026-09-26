@@ -66,6 +66,7 @@ Move to a host supporting server-rendered entity metadata, security headers and 
 - [Security / threat model](docs/security.md)
 - [QA evidence and limits](docs/qa.md)
 - [Implementation intelligence](docs/implementation-intelligence.md) · [records](docs/implementation-records.md) · [metrics](docs/metric-model.md) · [verification](docs/verification-model.md) · [provenance](docs/provenance-model.md) · [Blueprints](docs/blueprints.md) · [Solution Compiler](docs/solution-compiler.md)
+- [Provider profiles and use-case listings (xAI / Grok)](docs/provider-listings.md)
 - [Production architecture](docs/production-architecture.md) · [research notes](docs/technical-research-notes.md) · [progress and open gaps](docs/implementation-progress.md)
 
 ## Builds and creators

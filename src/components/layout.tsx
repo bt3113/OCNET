@@ -447,7 +447,7 @@ export function Layout() {
       <div className="app-shell">
         {!isSupabase && (
           <p className="demo-strip" role="note">
-            <strong>Demo</strong> Every record, Blueprint, implementer and outcome here is illustrative — none describes a real customer or result.
+            <strong>Demo</strong> Sample records, Blueprints, implementers and outcomes are illustrative — none describes a real customer or result. Provider use-case listings summarise public pages and link their source.
           </p>
         )}
         <header className="topbar">

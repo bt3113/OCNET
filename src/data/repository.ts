@@ -8,6 +8,7 @@ import {
   intelligenceUseCases,
 } from "./intelligence-seed";
 import { seed } from "./seed";
+import { xaiBuilds, xaiCreator, xaiProducts, xaiProvider, xaiRelatedStacks, xaiRelatedUseCases } from "./vendor-xai";
 export interface Repository {
   list<K extends Table>(table: K): Promise<Tables[K][]>;
   save<K extends Table>(table: K, value: Tables[K]): Promise<Tables[K]>;
@@ -26,19 +27,18 @@ export class DemoRepository implements Repository {
     try {
       const parsed: unknown = JSON.parse(raw);
       if (!Array.isArray(parsed)) throw Error();
-      const additions: { id: string }[] =
-        table === "products"
-          ? [...buildProducts, ...intelligenceProducts]
-          : table === "providers"
-            ? [...buildProviders, ...intelligenceProviders]
-            : table === "use_cases"
-              ? intelligenceUseCases
-              : table === "solution_stacks"
-                ? intelligenceStacks
-                : [];
+      // Catalogue entries added after a visitor's data was first stored.
+      const additions: Partial<Record<Table, { id: string }[]>> = {
+        products: [...buildProducts, ...intelligenceProducts, ...xaiProducts],
+        providers: [...buildProviders, ...intelligenceProviders, xaiProvider],
+        use_cases: [...intelligenceUseCases, ...xaiRelatedUseCases],
+        solution_stacks: [...intelligenceStacks, ...xaiRelatedStacks],
+        builds: xaiBuilds,
+        creator_profiles: [xaiCreator],
+      };
       return [
         ...parsed,
-        ...additions.filter((x) => !parsed.some((v) => v.id === x.id)),
+        ...(additions[table] ?? []).filter((x) => !parsed.some((v) => v.id === x.id)),
       ] as Tables[K][];
     } catch {
       throw new Error(

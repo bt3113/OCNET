@@ -19,6 +19,8 @@ export const slugify = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 90);
+/** A use case listed by a technology provider (compiled from its public pages), not a creator's build. */
+export const isProviderListing = (b: Pick<Build, "provenance">) => b.provenance === "third-party sourced";
 export const isPublicBuild = (b: Build) =>
   b.visibility === "public" &&
   b.publication === "published" &&

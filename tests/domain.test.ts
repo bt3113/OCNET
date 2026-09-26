@@ -2,6 +2,15 @@ import { describe, it, expect } from "vitest";
 import { DemoRepository } from "../src/data/repository";
 import { products, providers, useCases, stacks, seed } from "../src/data/seed";
 import { projectSchema } from "../src/components/forms";
+import {
+  XAI_USE_CASES_URL,
+  xaiBuilds,
+  xaiCreator,
+  xaiProducts,
+  xaiProvider,
+  xaiRelatedStacks,
+  xaiRelatedUseCases,
+} from "../src/data/vendor-xai";
 describe("catalogue integrity", () => {
   it("every product and stack resolves its relationships", () => {
     for (const p of products)
@@ -15,9 +24,32 @@ describe("catalogue integrity", () => {
           expect(products.some((p) => p.id === id)).toBe(true);
       }
   });
-  it("labels all seed marketplace records as demo", () => {
+  // Seed rows are demo data unless they come from a vendor module that cites its
+  // public sources (currently xAI). Sourced rows must link to where they came from;
+  // nothing else may leave the demo label.
+  it("labels seed records as demo unless they cite a public source", () => {
+    const sourcedIds = new Set<string>([
+      xaiProvider.id,
+      xaiCreator.id,
+      ...xaiProducts.map((row) => row.id),
+      ...xaiBuilds.map((row) => row.id),
+      ...xaiRelatedUseCases.map((row) => row.id),
+      ...xaiRelatedStacks.map((row) => row.id),
+    ]);
     for (const rows of Object.values(seed))
-      for (const row of rows) expect(row.provenance).toBe("demo");
+      for (const row of rows as { id: string; provenance: string }[]) {
+        if (row.provenance === "demo") continue;
+        expect(sourcedIds.has(row.id), `${row.id} is not demo data and has no declared source`).toBe(true);
+        expect(["third-party sourced", "inferred"]).toContain(row.provenance);
+      }
+    expect(xaiProvider.listing?.sources.every((source) => source.url.startsWith("https://"))).toBe(true);
+    for (const product of xaiProducts) expect(product.sourceUrl).toMatch(/^https:\/\//);
+    for (const build of xaiBuilds) {
+      expect(build.sources.some((source) => source.evidence === "third-party sourced" && source.url === XAI_USE_CASES_URL)).toBe(true);
+      expect(build.cloneAllowed || build.commercialUseAllowed).toBe(false);
+      expect(`${build.buildCost}${build.buildTime}`).toBe("");
+      expect(build.description).not.toMatch(/caused|resulted in|increased|reduced .* by/i);
+    }
   });
   it("validates project requirements", () => {
     expect(
