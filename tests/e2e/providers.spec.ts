@@ -70,3 +70,41 @@ for (const path of ["/technology-vendors/xai", "/technology-vendors/xai?tab=abou
     expect(result.violations.map((violation) => `${violation.id}: ${violation.nodes.slice(0, 3).map((node) => node.target.join(" ")).join(" | ")}`)).toEqual([]);
   });
 }
+
+test("a vendor claims its profile with a DNS record and a reviewer approves it", async ({ page }) => {
+  let txt: string[] = [];
+  await page.route("https://cloudflare-dns.com/dns-query**", (route) =>
+    route.fulfill({ contentType: "application/dns-json", body: JSON.stringify({ Status: 0, Answer: txt.map((data) => ({ type: 16, data: `"${data}"` })) }) }),
+  );
+  await page.goto(`${base}/technology-vendors/xai?tab=about`);
+  await page.getByRole("link", { name: /Claim this profile/ }).click();
+  await expect(page).toHaveURL(/\/provider\/claims\?vendor=xai/);
+  await expect(page.getByLabel("Company domain")).toHaveValue("x.ai");
+  await page.getByLabel("Work email").fill("me@gmail.com");
+  await page.getByLabel("Your role").fill("I lead developer relations at xAI.");
+  await page.getByRole("button", { name: "Submit claim" }).click();
+  await expect(page.getByRole("alert")).toContainText("Use an email address at x.ai");
+  await page.getByLabel("Work email").fill("me@x.ai");
+  await page.getByRole("button", { name: "Submit claim" }).click();
+  const value = page.locator(".dns-instructions code").nth(1);
+  await expect(page.locator(".dns-instructions code").first()).toHaveText("_oracnet-verification.x.ai");
+  const record = (await value.textContent()) ?? "";
+  expect(record).toMatch(/^oracnet-verification=[0-9a-f]{32}$/);
+
+  await page.goto(`${base}/admin/vendor-claims`);
+  const card = page.locator(".moderation-card", { hasText: "xAI" });
+  await expect(card).toContainText("matches the vendor website");
+  await expect(card.getByRole("button", { name: "Approve claim" })).toBeDisabled();
+  await card.getByRole("button", { name: "Check DNS record" }).click();
+  await expect(card).toContainText("DNS record not found yet");
+  txt = ["v=spf1 -all", record];
+  await card.getByRole("button", { name: "Check DNS record" }).click();
+  await expect(card).toContainText("DNS record verified");
+  await card.getByRole("button", { name: "Approve claim" }).click();
+  await expect(page.locator(".moderation-history")).toContainText("approved");
+
+  await page.goto(`${base}/technology-vendors/xai?tab=about`);
+  await expect(page.locator("main")).toContainText("MAINTAINED BY THE VENDOR");
+  await expect(page.locator("main")).toContainText("xAI has claimed this profile");
+  await expect(page.getByRole("link", { name: /Claim this profile/ })).toHaveCount(0);
+});

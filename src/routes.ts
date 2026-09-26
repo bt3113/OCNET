@@ -109,6 +109,7 @@ export const buildAdminRoutes = [
   "/admin/creators",
   "/admin/offers",
   "/admin/reports",
+  "/admin/vendor-claims",
 ];
 export const buildProviderRoutes = ["/provider/builds", "/provider/claims"];
 

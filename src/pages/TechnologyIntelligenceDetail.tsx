@@ -370,7 +370,7 @@ export default function TechnologyIntelligenceDetail() {
               <div className="row wrap">
                 <Link className="button light" to="/provider/compatibility">Submit relationship evidence</Link>
                 <Link className="button light" to="/provider/implementations">Submit a correction</Link>
-                <Link className="button light" to="/provider/claims">Claim this profile</Link>
+                {provider && provider.listing?.status !== "claimed" && <Link className="button light" to={`/provider/claims?vendor=${provider.id}`}>Claim this profile</Link>}
               </div>
             </div>
           </section>

@@ -79,7 +79,7 @@ Every compiled candidate shows its provenance (`candidateProvenance`): the Bluep
 | Actor | Can | Cannot |
 | --- | --- | --- |
 | Solution Provider | Publish and edit own Builds, offers and Blueprints; propose one Use Case per Build; withdraw a pending proposal | Create public Use Cases directly; edit others' Builds; change taxonomy |
-| Technology Vendor (claimed) | Maintain company details, products and its own use-case statements | Edit or remove independent Builds, Implementation Records, evidence or reviews |
+| Technology Vendor (claimed, DNS-verified) | Maintain company details, products and its own use-case statements | Edit or remove independent Builds, Implementation Records, evidence or reviews |
 | Customer | Attest selected claims through a scoped, single-use link | Edit the record |
 | Moderator (admin) | Map, approve, reject, merge, add labels, archive; all audited | Merge automatically; delete history |
 

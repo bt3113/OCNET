@@ -70,7 +70,6 @@ const normalized = new Set([
   "solution_runs",
   "solution_candidates",
   "solution_candidate_items",
-  "solution_explanations",
   "staleness_reviews",
   "implementation_fingerprints",
   "use_case_categories",

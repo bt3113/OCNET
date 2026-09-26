@@ -1158,7 +1158,6 @@ export const intelligenceSeed: Partial<{
   solution_runs: [],
   solution_candidates: [],
   solution_candidate_items: [],
-  solution_explanations: [],
   staleness_reviews: [],
   implementation_fingerprints: [],
 };

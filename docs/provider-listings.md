@@ -41,9 +41,16 @@ The original three research/analysis entries and the separate image-editing entr
 - Technology pages list vendor-stated Use Cases separately from independent Builds using the technology.
 - The profile remains unclaimed and explicitly says xAI has not reviewed the Oracnet profile.
 
-## Claiming (future)
+## Claiming
 
-A claimed profile (`status: "claimed"`) would be maintained by the vendor after domain verification. It could edit company details, products and its own statements, and never independent Builds, Implementation Records, evidence or reviews.
+A vendor claims its profile from **Claim this profile** (`/provider/claims?vendor=<id>`):
+
+1. The claimant enters the vendor's own domain (it must match the profile's website), a work email at that domain, and their role.
+2. Oracnet issues a random token. The claimant publishes it as a DNS TXT record: `_oracnet-verification.<domain>` = `oracnet-verification=<token>`.
+3. A reviewer at `/admin/vendor-claims` runs **Check DNS record** (DNS-over-HTTPS from the reviewer's browser). The result is recorded on the claim.
+4. Approval is possible only after a verified check. It marks the listing `claimed`, and the profile then reads “Maintained by the vendor”. In connected mode, a trigger updates the listing and writes an audit event.
+
+A claimed profile can maintain company details, products and its own statements. It never controls independent Builds, Implementation Records, evidence or reviews. Granting the claimant edit rights is still a separate administrator action.
 
 ## Tests
 

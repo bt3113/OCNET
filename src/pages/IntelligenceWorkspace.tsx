@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowRight, Archive, CalendarClock, CheckCircle2, FileSearch, Flag, GitBranch, LockKeyhole, RotateCcw, ShieldCheck, ShieldX, XCircle } from "lucide-react";
+import { ArrowRight, Archive, Building2, CalendarClock, CheckCircle2, FileSearch, Flag, GitBranch, LockKeyhole, RotateCcw, ShieldCheck, ShieldX, Tags, XCircle } from "lucide-react";
 import { PageHeading, WorkspaceNotice } from "../components/layout";
 import { Badge, EmptyState, ErrorState, Modal, Skeleton } from "../components/ui";
 import { BlueprintCard, EvidenceBadge, RelationshipTypeBadge, RightsBadge, StalenessBadge } from "../components/intelligence";
@@ -541,9 +541,11 @@ function AdminQueue({ path, data }: { path: string; data: Data }) {
 
   return frame("Review queues", "Choose a queue.", (
     <div className="grid three">
-      <Link className="card workspace-row" to="/admin/claims"><ShieldCheck size={20} aria-hidden /><span><strong>Claims</strong><small>{data.claims.filter((claim) => claim.status === "pending").length} pending</small></span></Link>
+      <Link className="card workspace-row" to="/admin/claims"><ShieldCheck size={20} aria-hidden /><span><strong>Evidence claims</strong><small>{data.claims.filter((claim) => claim.status === "pending").length} pending</small></span></Link>
       <Link className="card workspace-row" to="/admin/blueprints"><GitBranch size={20} aria-hidden /><span><strong>Blueprints</strong><small>{data.blueprints.filter((blueprint) => blueprint.moderationState === "pending").length} pending</small></span></Link>
       <Link className="card workspace-row" to="/admin/implementations"><FileSearch size={20} aria-hidden /><span><strong>Implementations</strong><small>{data.implementations.filter((record) => record.moderationState === "pending").length} pending</small></span></Link>
+      <Link className="card workspace-row" to="/admin/use-cases"><Tags size={20} aria-hidden /><span><strong>Use Cases</strong><small>Proposals, merges and labels</small></span></Link>
+      <Link className="card workspace-row" to="/admin/vendor-claims"><Building2 size={20} aria-hidden /><span><strong>Vendor claims</strong><small>Technology Vendor profile claims</small></span></Link>
     </div>
   ));
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DemoRepository } from "../src/data/repository";
+import { DemoRepository } from "../src/data/demo-repository";
 import { xaiProvider } from "../src/data/vendor-xai";
 
 describe("demo catalogue refresh", () => {
@@ -43,5 +43,15 @@ describe("demo catalogue refresh", () => {
     const xai = rows.find((row) => row.id === "xai");
     expect(xai?.listing?.note).not.toBe("stale catalogue copy");
     expect(xai?.listing?.status).toBe("unclaimed");
+  });
+
+  it("keeps an approved vendor claim while refreshing the sourced xAI content", async () => {
+    localStorage.setItem(
+      "oracnet:v1:providers",
+      JSON.stringify([{ ...xaiProvider, listing: { ...xaiProvider.listing!, status: "claimed", note: "stale catalogue copy" } }]),
+    );
+    const xai = (await new DemoRepository().list("providers")).find((row) => row.id === "xai");
+    expect(xai?.listing?.status).toBe("claimed");
+    expect(xai?.listing?.note).not.toBe("stale catalogue copy");
   });
 });

@@ -327,3 +327,12 @@
   .supply-gap-table td.name,.supply-gap-table td.action{flex-basis:100%}
   .supply-gap-table td.num::before{content:attr(data-label) " ";color:#655a57}
 }
+.moderation-labels{list-style:none;padding:0;margin:0;display:grid;gap:6px;font-size:13.5px}
+.moderation-labels>li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line)}
+.moderation-labels form label{flex:1 1 180px}
+.dns-instructions{border:1px dashed #c9bda6;border-radius:10px;padding:10px 12px;font-size:13px;background:#fffdf8}
+.dns-instructions p{margin:0 0 6px}
+.dns-instructions code{font-size:12.5px;overflow-wrap:anywhere;background:#f3eee4;padding:1px 5px;border-radius:5px}
+.compare-tray{animation:compare-tray-in .28s ease-out}
+@keyframes compare-tray-in{from{translate:0 70px;opacity:0}to{translate:0 0;opacity:1}}
+@media (prefers-reduced-motion:reduce){.compare-tray{animation:none}}

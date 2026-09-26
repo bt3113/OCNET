@@ -104,6 +104,11 @@ test("a proposed Use Case stays private and can be mapped to an existing one", a
   await card.getByLabel("Existing Use Case").selectOption({ label: "Chase overdue invoices" });
   await card.getByRole("button", { name: "Confirm mapping" }).click();
   await expect(page.locator(".moderation-card", { hasText: "Follow up with customers about late payments" })).toHaveCount(0);
+  // The provider is told the outcome.
+  await page.goto(`${base}/app/notifications`);
+  const notice = page.locator(".notification", { hasText: "Use Case proposal matched" });
+  await expect(notice).toContainText("Chase overdue invoices");
+  await expect(notice.getByRole("link", { name: /View details/ })).toHaveAttribute("href", /\/use-cases\//);
 
   await page.goto(buildUrl);
   await expect(page.locator("main").getByRole("link", { name: /Chase overdue invoices/ }).first()).toBeVisible();
@@ -188,4 +193,26 @@ test("accessibility of the Use Cases step with the listbox open", async ({ page 
   await expect(page.getByRole("listbox")).toBeVisible();
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   expect(result.violations.map((violation) => `${violation.id}: ${violation.nodes.slice(0, 3).map((node) => node.target.join(" ")).join(" | ")}`)).toEqual([]);
+});
+test("moderators edit and remove labels, and restore an archived Use Case", async ({ page }) => {
+  await page.goto(`${base}/admin/use-cases?tab=labels`);
+  await page.getByRole("combobox", { name: /^Use Case/ }).selectOption({ label: "Chase overdue invoices" });
+  await page.getByLabel("New label").fill("late payment reminders");
+  await page.getByRole("button", { name: "Add label" }).click();
+  await page.getByRole("button", { name: "Edit label late payment reminders" }).click();
+  await page.getByLabel("Label text").fill("late payment nudges");
+  await page.getByRole("button", { name: "Save label" }).click();
+  await expect(page.locator(".moderation-labels")).toContainText("late payment nudges");
+  await page.getByRole("button", { name: "Remove label late payment nudges" }).click();
+  await expect(page.locator(".moderation-labels")).not.toContainText("late payment nudges");
+
+  await page.getByRole("button", { name: "Archive this Use Case" }).click();
+  await page.goto(`${base}/use-cases/chase-overdue-invoices`);
+  await expect(page.getByText("Use Case not found")).toBeVisible();
+  await page.goto(`${base}/admin/use-cases?tab=labels`);
+  const archived = page.locator(".moderation-labels li", { hasText: "Chase overdue invoices" });
+  await archived.getByRole("button", { name: "Restore" }).click();
+  await expect(page.getByText("None archived.")).toBeVisible();
+  await page.goto(`${base}/use-cases/chase-overdue-invoices`);
+  await expect(page.locator("main h1")).toHaveText("Chase overdue invoices");
 });

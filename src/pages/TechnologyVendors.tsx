@@ -210,13 +210,16 @@ function TechnologyVendorProfile({ vendor, market }: { vendor: Provider; market:
                     </ul>
                   </>
                 )}
-                <h2 className="tab-section-title">If {vendor.name} claims this profile</h2>
+                <h2 className="tab-section-title">{listing?.status === "claimed" ? `${vendor.name} has claimed this profile` : `If ${vendor.name} claims this profile`}</h2>
                 <p className="tab-section-note">
                   A claimed profile lets the vendor maintain company details, products and its own use-case statements. It does not let the vendor delete or rewrite independent Builds, Implementation Records, evidence or reviews.
+                  {listing?.status === "claimed" ? " The claim was verified with a DNS record on the vendor's own domain." : " Claims are verified with a DNS record on the vendor's own domain."}
                 </p>
-                <Link className="button light" to="/provider/claims">
-                  Claim this profile <ArrowRight size={14} aria-hidden />
-                </Link>
+                {listing?.status !== "claimed" && (
+                  <Link className="button light" to={`/provider/claims?vendor=${vendor.id}`}>
+                    Claim this profile <ArrowRight size={14} aria-hidden />
+                  </Link>
+                )}
                 <EntityCountRow className="muted" counts={[[products.length, "product"], [useCases.length, "vendor statement"]]} />
                 <p className="muted small-print">{plural(builds.length, "independent Build")} and {plural(records.length, "deployment record")} reference this vendor’s products.</p>
               </section>

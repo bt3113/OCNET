@@ -36,3 +36,11 @@ Apply `202609250001_implementation_intelligence.sql`, `202609250002_intelligence
 Deploy Edge Functions `attestation` and `evidence` with secrets `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ORIGIN`, `APP_BASE_PATH` (e.g. `/OCNET`), and for invitations `RESEND_API_KEY` + `EMAIL_FROM`. Without the email secrets, invitation creation fails closed with 503 and creates nothing. Schedule a job to purge `attestation_contacts` past `deleteAfter`.
 
 The Pages build stays demo-only. `postbuild.mjs` prerenders metadata only for published, approved, public records and Blueprints and adds implementer profiles; drafts never reach the sitemap.
+
+## Marketplace follow-ups (202609270001)
+
+Apply `202609270001_marketplace_followups.sql` after `202609260001_marketplace_taxonomy.sql`, then load the catalogue with `supabase/seed.sql` (it now includes the Use Case taxonomy, aliases, redirects and vendor sources). The optional `seed-builds.sql` needs four Auth UUIDs: `demo_owner_id`, `demo_studio_id`, `demo_maya_id`, `demo_atlas_id`.
+
+- **Maintenance:** enable `pg_cron` (Database → Extensions) *before* applying the migration and it schedules `oracnet-daily-maintenance` at 03:17 UTC. If you enable it later, run `select cron.schedule('oracnet-daily-maintenance', '17 3 * * *', 'select public.run_marketplace_maintenance()');` once. The service role can also call `run_marketplace_maintenance()` directly.
+- **Vendor claims:** reviewers' browsers call `https://cloudflare-dns.com/dns-query`. If you add a Content-Security-Policy, allow that host in `connect-src`.
+- **Notifications:** proposal outcomes are written to `notifications` by a trigger. Email delivery is not wired for them; the `attestation` function's Resend setup is the model if you want it.

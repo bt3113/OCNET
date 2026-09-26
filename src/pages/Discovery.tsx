@@ -5,8 +5,6 @@ import { useRecords } from "../state";
 import { PageHeading } from "../components/layout";
 import {
   TechnologyCard,
-  ProviderCard,
-  UseCaseCard,
   CategoryCard,
   SolutionStackCard,
   Pagination,
@@ -25,7 +23,6 @@ export default function Discovery() {
   const query = params.get("q") || "";
   const category = params.get("category") || "";
   const deployment = params.get("deployment") || "";
-  const region = params.get("region") || "";
   const sort = params.get("sort") || "recommended";
   const page = Number(params.get("page") || 1);
   function set(key: string, value: string) {
@@ -42,20 +39,8 @@ export default function Discovery() {
     refetch,
   } = useRecords("products");
   const { data: categories = [] } = useRecords("categories");
-  const { data: providers = [] } = useRecords("providers");
-  const { data: integrators = [] } = useRecords("integrators");
-  const { data: consultants = [] } = useRecords("consultants");
-  const { data: cases = [] } = useRecords("use_cases");
   const { data: stacks = [] } = useRecords("solution_stacks");
   const titles: Record<string, [string, string]> = {
-    explore: [
-      "What do you want to achieve?",
-      "Start with an outcome. Discover the tools and partners to get there.",
-    ],
-    search: [
-      "Search the ecosystem",
-      "Find the capabilities, technologies, and people for your next idea.",
-    ],
     technologies: [
       "Technology, with possibility",
       "Explore products and platforms for what you want to build.",
@@ -63,22 +48,6 @@ export default function Discovery() {
     marketplace: [
       "The technology marketplace",
       "Find the right tools. Understand your options. Build with confidence.",
-    ],
-    providers: [
-      "Meet the technology providers",
-      "Explore the companies behind your next technology stack.",
-    ],
-    integrators: [
-      "Find your implementation partner",
-      "Connect with specialists who help turn technology into working solutions.",
-    ],
-    consultants: [
-      "Independent expertise",
-      "Find advice for your technology decisions and implementation plans.",
-    ],
-    "use-cases": [
-      "Start with what you want to achieve",
-      "From business challenge to practical solution stack.",
     ],
     "solution-stacks": [
       "Better together. Built for an outcome.",
@@ -89,16 +58,7 @@ export default function Discovery() {
       "A connected ecosystem of technology and expertise.",
     ],
   };
-  const [title, description] = titles[path] || titles.explore;
-  const providerType = ["providers", "integrators", "consultants"].includes(
-    path,
-  );
-  const source =
-    path === "providers"
-      ? providers
-      : path === "integrators"
-        ? integrators
-        : consultants;
+  const [title, description] = titles[path] || titles.marketplace;
   const filteredProducts = products
     .filter(
       (p) =>
@@ -109,23 +69,6 @@ export default function Discovery() {
         (!deployment || p.deployment === deployment),
     )
     .sort((a, b) => (sort === "name" ? a.name.localeCompare(b.name) : 0));
-  const filteredProviders = source
-    .filter(
-      (p) =>
-        (p.name + " " + p.description)
-          .toLowerCase()
-          .includes(query.toLowerCase()) &&
-        (!region || p.region === region) &&
-        (!category || p.category === category),
-    )
-    .sort((a, b) => (sort === "name" ? a.name.localeCompare(b.name) : 0));
-  const filteredCases = cases.filter(
-    (p) =>
-      (p.name + " " + p.description)
-        .toLowerCase()
-        .includes(query.toLowerCase()) &&
-      (!category || p.category === category),
-  );
   const filters = (
     <div className="filter-controls">
       <label>
@@ -142,21 +85,7 @@ export default function Discovery() {
           ))}
         </select>
       </label>
-      {providerType ? (
-        <label>
-          Region
-          <select
-            value={region}
-            onChange={(e) => set("region", e.target.value)}
-          >
-            <option value="">All regions</option>
-            {["Global", "Europe", "North America"].map((x) => (
-              <option key={x}>{x}</option>
-            ))}
-          </select>
-        </label>
-      ) : (
-        <label>
+      <label>
           Deployment
           <select
             value={deployment}
@@ -167,7 +96,6 @@ export default function Discovery() {
             <option>Hybrid</option>
           </select>
         </label>
-      )}
       <label>
         Sort by
         <select value={sort} onChange={(e) => set("sort", e.target.value)}>
@@ -248,16 +176,12 @@ export default function Discovery() {
       </Modal>
       <div className="results-label">
         <span>
-          {providerType
-            ? filteredProviders.length
-            : path === "use-cases"
-              ? filteredCases.length
-              : path === "categories"
-                ? categories.length
-                : path === "solution-stacks"
-                  ? stacks.length
-                  : filteredProducts.length}{" "}
-          {providerType ? "partners" : "results"}
+          {path === "categories"
+            ? categories.length
+            : path === "solution-stacks"
+              ? stacks.length
+              : filteredProducts.length}{" "}
+          results
         </span>
         <Badge>Sample catalogue · no paid ranking</Badge>
       </div>
@@ -269,12 +193,6 @@ export default function Discovery() {
               <CategoryCard item={c} key={c.id} />
             ))}
         </div>
-      ) : path === "use-cases" ? (
-        <div className="usecase-grid">
-          {filteredCases.map((c) => (
-            <UseCaseCard item={c} key={c.id} />
-          ))}
-        </div>
       ) : path === "solution-stacks" ? (
         <div className="grid three">
           {stacks
@@ -283,38 +201,8 @@ export default function Discovery() {
               <SolutionStackCard stack={s} key={s.id} />
             ))}
         </div>
-      ) : providerType ? (
-        <>
-          <div className="grid two">
-            {filteredProviders.slice((page - 1) * 8, page * 8).map((p) => (
-              <ProviderCard provider={p} key={p.id} type={path} />
-            ))}
-          </div>
-          {!filteredProviders.length && (
-            <EmptyState
-              title="No partners match these filters"
-              description="Try another category or clear your search."
-            />
-          )}
-          <Pagination
-            page={page}
-            count={Math.ceil(filteredProviders.length / 8)}
-            onChange={(p) => set("page", String(p))}
-          />
-        </>
       ) : (
         <>
-          {path === "search" && filteredCases.length > 0 && (
-            <>
-              <h2 className="subheading">Matching use cases</h2>
-              <div className="usecase-grid">
-                {filteredCases.slice(0, 3).map((c) => (
-                  <UseCaseCard item={c} key={c.id} />
-                ))}
-              </div>
-              <h2 className="subheading">Technologies</h2>
-            </>
-          )}
           <div className="grid three">
             {filteredProducts.slice((page - 1) * 9, page * 9).map((p) => (
               <TechnologyCard product={p} key={p.id} />
@@ -331,22 +219,6 @@ export default function Discovery() {
             count={Math.ceil(filteredProducts.length / 9)}
             onChange={(p) => set("page", String(p))}
           />
-          {path === "search" && (
-            <>
-              <h2 className="subheading">Providers</h2>
-              <div className="grid two">
-                {providers
-                  .filter((p) =>
-                    (p.name + " " + p.description)
-                      .toLowerCase()
-                      .includes(query.toLowerCase()),
-                  )
-                  .map((p) => (
-                    <ProviderCard provider={p} key={p.id} />
-                  ))}
-              </div>
-            </>
-          )}
         </>
       )}
     </>
