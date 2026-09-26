@@ -154,3 +154,16 @@ Production hosting + observability review
 ```
 
 Do not collapse those acceptance stages into a claim that the current static Pages demo is an enterprise production deployment.
+
+## Engineering follow-ups (not blockers, not yet done)
+
+Checked against `main` at `bc0a84e`:
+
+- **Taxonomy seed for connected mode.** `use_case_categories`, editorial placements, aliases, redirects and the xAI `use_case_sources` exist only in the TypeScript demo seed (`src/data/taxonomy-seed.ts`, `src/data/vendor-xai.ts`); `supabase/seed.sql` has none of them. Add a data migration or seed step before the Supabase staging run above.
+- **Proposal outcome notifications.** A provider only sees a mapped, approved or rejected proposal on the dashboard (“Your Use Case proposals” in `src/components/SupplyGaps.tsx`). Nothing notifies them, in-app or by email.
+- **Moderation gaps.** `/admin/use-cases` can add labels and archive a Use Case, but has no UI to edit or remove a label or to un-archive.
+- **Vendor claim flow.** “Claim this profile” on `/technology-vendors/:slug` links to `/provider/claims`. Domain or email verification for vendors is not built.
+- **Dead code.** The `providerType` branch in `src/pages/Discovery.tsx` belongs to the removed `/providers` directory route. The unused `solution_explanations` table (`202609250001`) can be dropped in a later migration.
+- **Performance.** The main bundle is about 496 kB (156 kB gzip) and was not re-measured in the field for this release (no LCP/INP data).
+- **Scheduled jobs.** Still missing for attestation expiry, contact purge, freshness recompute and search embeddings (see `implementation-progress.md`).
+- **Legal review.** Still to do: terms, marketplace terms, attestation wording, retention periods and the vendor-content attribution policy.
