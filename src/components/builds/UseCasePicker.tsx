@@ -272,6 +272,14 @@ function ProposalForm({
   const [subcategoryId, setSubcategoryId] = useState("");
   const [busy, setBusy] = useState(false);
   const guidance = titleGuidance(title || text, providerName);
+  // Validate exactly what will be sent: the confirmed title, or the tidied suggestion.
+  const finalTitle = (title || guidance.suggestion).trim();
+  const errors = [
+    ...new Set([
+      ...titleGuidance(finalTitle, providerName).errors,
+      ...(text.trim().length < 8 ? ["Describe the work in at least 8 characters."] : []),
+    ]),
+  ];
   const duplicates = useMemo(() => (text.trim().length >= 4 ? suggestUseCases(text, catalogue, { limit: 3, exclude: build.useCaseIds }) : []), [text, catalogue, build.useCaseIds]);
   const topCategories = categories.filter((category) => category.level === "category").sort((a, b) => a.sortOrder - b.sortOrder);
   const subcategories = categories.filter((category) => category.parentId === categoryId).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -289,12 +297,12 @@ function ProposalForm({
         <form
           onSubmit={async (event) => {
             event.preventDefault();
-            if (guidance.errors.length) return;
+            if (errors.length) return;
             setBusy(true);
             try {
               await onPropose({
                 originalText: text.trim(),
-                suggestedTitle: (title || guidance.suggestion).trim(),
+                suggestedTitle: finalTitle,
                 suggestedCategoryId: categoryId || undefined,
                 suggestedSubcategoryId: subcategoryId || undefined,
               });
@@ -327,9 +335,9 @@ function ProposalForm({
             </div>
           )}
           <div id={`${id}-guidance`} aria-live="polite">
-            {text.trim() && guidance.errors.length > 0 && (
+            {text.trim() && errors.length > 0 && (
               <ul className="field-errors">
-                {guidance.errors.map((error) => (
+                {errors.map((error) => (
                   <li key={error}>{error}</li>
                 ))}
               </ul>
@@ -386,7 +394,7 @@ function ProposalForm({
               </select>
             </label>
           </div>
-          <button type="submit" className="button dark" disabled={busy || !text.trim() || guidance.errors.length > 0}>
+          <button type="submit" className="button dark" disabled={busy || !text.trim() || errors.length > 0}>
             {busy ? "Submitting…" : "Submit proposal for review"}
           </button>
         </form>

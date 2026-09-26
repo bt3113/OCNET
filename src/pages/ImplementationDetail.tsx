@@ -368,7 +368,7 @@ export default function ImplementationDetail() {
             <div><dt>Went live</dt><dd>{record.goLiveDate ?? "Not disclosed"}</dd></div>
             <div><dt>Setup cost</dt><dd>{implementationCostLabel(record)}</dd></div>
             {sourceBuild && <div><dt>Build used</dt><dd><Link to={`/builds/${sourceBuild.slug}`}>{sourceBuild.name}</Link></dd></div>}
-            <div><dt>Solution Provider</dt><dd>{implementers.map((partner) => <Link key={partner.id} to={providerForImplementer(solutionProviderList, partner.id) ? `/solution-providers/${providerForImplementer(solutionProviderList, partner.id)!.slug}` : `/implementers/${partner.slug}`}>{partner.name}</Link>)}{!implementers.length && "Not recorded"}</dd></div>
+            <div><dt>Solution Provider</dt><dd>{implementers.map((partner) => <Link key={partner.id} to={providerForImplementer(solutionProviderList, partner.id) ? `/solution-providers/${providerForImplementer(solutionProviderList, partner.id)!.slug}` : `/solution-providers`}>{partner.name}</Link>)}{!implementers.length && "Not recorded"}</dd></div>
           </dl>
         </div>
         <aside className="implementation-hero-actions card">

@@ -162,6 +162,9 @@ export function remixBuild(
     category: source.category,
     industry: source.industry,
     useCaseIds: [...source.useCaseIds],
+    // A remix starts without the source's pending proposal or its owner's Blueprint link.
+    useCaseProposalId: null,
+    blueprintId: null,
     capabilityIds: [...source.capabilityIds],
     stack: source.stack.map((s) => ({ ...s, id: ids.get(s.id)! })),
     connections: source.connections.map((c) => ({

@@ -119,7 +119,7 @@ describe("Proposals and merges", () => {
     const target = useCases.find((useCase) => useCase.id === "chase-overdue-invoices")!;
     const result = mapProposal(proposal, target, build({ useCaseIds: [], useCaseProposalId: "p1" }), "admin");
     expect(result.build?.useCaseIds).toEqual(["chase-overdue-invoices"]);
-    expect(result.build?.useCaseProposalId).toBeUndefined();
+    expect(result.build?.useCaseProposalId).toBeNull();
     expect(result.proposal.status).toBe("mapped");
     expect(result.aliases[0]).toMatchObject({ aliasType: "original-source", label: proposal.originalText });
     expect(result.useCase).toBeUndefined();
@@ -140,6 +140,24 @@ describe("Proposals and merges", () => {
     expect(result.aliases.some((alias) => alias.label === from.name)).toBe(true);
     const resolution = resolveUseCase(from.slug, [result.from, into], [result.redirect], seed.use_case_categories!);
     expect(resolution).toEqual({ kind: "redirect", to: `/use-cases/${into.slug}` });
+  });
+  it("mapping refuses to drop a Use Case from a Build that is already full", () => {
+    const target = useCases.find((useCase) => useCase.id === "chase-overdue-invoices")!;
+    const full = build({ useCaseIds: ["enquiry-to-booking", "customer-support", "business-analytics"], useCaseProposalId: "p1" });
+    expect(() => mapProposal(proposal, target, full, "admin")).toThrow(/already has 3/);
+  });
+  it("moderation records platform provenance, never the proposer's value", () => {
+    const forged = { ...proposal, provenance: "verified" as UseCaseProposal["provenance"] };
+    const target = useCases.find((useCase) => useCase.id === "chase-overdue-invoices")!;
+    expect(mapProposal(forged, target, undefined, "admin").aliases[0].provenance).toBe("community supplied");
+    const approved = approveProposal(forged, { title: "Send invoices and record payments", description: "Issue invoices and record payments.", categoryId: "finance", subcategoryId: "fin-ar" }, undefined, "admin", []);
+    expect(approved.useCase!.provenance).toBe("community supplied");
+    expect(approved.sources[0].provenance).toBe("community supplied");
+  });
+  it("follows chained merges to the surviving Use Case", () => {
+    const [a, b, c] = useCases.slice(0, 3);
+    const chain = [{ ...a, status: "merged" as const, mergedIntoId: b.id }, { ...b, status: "merged" as const, mergedIntoId: c.id }, c];
+    expect(resolveUseCase(a.slug, chain, [], seed.use_case_categories!)).toEqual({ kind: "redirect", to: `/use-cases/${c.slug}` });
   });
 });
 

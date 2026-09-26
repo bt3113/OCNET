@@ -75,9 +75,9 @@ export interface Build extends RecordBase {
   featured: boolean;
   ownershipConfirmed: boolean;
   /** At most one pending Use Case proposal (`use_case_proposals`). Counts toward the 3-Use-Case limit. */
-  useCaseProposalId?: string;
+  useCaseProposalId?: string | null;
   /** Primary reusable Blueprint for this Build (`blueprints`). */
-  blueprintId?: string;
+  blueprintId?: string | null;
 }
 export interface CreatorProfile extends RecordBase {
   slug: string;

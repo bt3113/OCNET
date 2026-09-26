@@ -58,8 +58,12 @@ export async function moderateReject(proposal: UseCaseProposal, build: Build | u
 
 export async function moderateMerge(from: UseCase, into: UseCase, reviewerId: string, data: { builds: Build[]; sources: UseCaseSource[]; aliases: UseCaseAlias[] }) {
   if (isSupabase) return void (await rpc("merge_use_cases", { from_id: from.id, into_id: into.id }));
+  if (from.status && from.status !== "approved") throw new Error("Only an approved Use Case can be merged.");
   const result = mergeUseCases(from, into, data);
   await save("use_cases", result.from);
+  // Earlier merges into `from` now point at `into`, so old URLs keep resolving.
+  for (const useCase of await list("use_cases")) if (useCase.mergedIntoId === from.id) await save("use_cases", { ...useCase, mergedIntoId: into.id });
+  for (const redirect of await list("use_case_redirects")) if (redirect.targetType === "use-case" && redirect.target === from.id) await save("use_case_redirects", { ...redirect, target: into.id });
   for (const build of result.builds) await save("builds", build);
   for (const source of result.sources) await save("use_case_sources", source);
   for (const alias of result.aliases) await save("use_case_aliases", alias);
@@ -87,6 +91,8 @@ export async function addAlias(useCase: UseCase, label: string, aliasType: UseCa
 }
 
 export async function archiveUseCase(useCase: UseCase, reviewerId: string) {
+  // Connected mode: the RPC also unpublishes the row (published ⇒ approved).
+  if (isSupabase) return void (await rpc("archive_use_case", { target: useCase.id }));
   await save("use_cases", { ...useCase, status: "archived", updatedAt: new Date().toISOString() });
   if (!isSupabase) await save("audit_events", auditEvent(reviewerId, "use-case", useCase.id, "use-case-archived", new Date()));
 }

@@ -173,7 +173,8 @@ create trigger guard_build_indexing before insert or update on public.builds for
 
 -- Build documents keep Use Case order (first = primary) and the new links.
 create or replace function public.build_document(target text) returns jsonb language sql stable security invoker set search_path='' as $$
- select to_jsonb(b)||jsonb_build_object(
+ -- A pending proposal id is private to the Build's editors.
+ select (to_jsonb(b) - case when public.can_edit_build(b.id) then '' else 'useCaseProposalId' end)||jsonb_build_object(
  'stack',coalesce((select jsonb_agg(to_jsonb(s)-'buildId'-'position' order by position) from public.build_stack_items s where s."buildId"=b.id),'[]'::jsonb),
  'connections',coalesce((select jsonb_agg(to_jsonb(c)-'buildId') from public.build_connections c where c."buildId"=b.id),'[]'::jsonb),
  'media',coalesce((select jsonb_agg(to_jsonb(m)-'buildId'-'position' order by position) from public.build_media m where m."buildId"=b.id),'[]'::jsonb),
@@ -251,8 +252,11 @@ create policy proposals_read on public.use_case_proposals for select to authenti
 create policy proposals_insert on public.use_case_proposals for insert to authenticated
   with check(
     "proposedBy" = auth.uid() and status = 'pending' and "resolvedUseCaseId" is null and "reviewedBy" is null and "reviewedAt" is null
-    and public.can_edit_build("buildId")
-    and exists(select 1 from public.creator_profiles c where c.id = "creatorId" and c."ownerId" = auth.uid())
+    and "reviewNote" = '' and provenance = 'community supplied'
+    and "createdAt" between now() - interval '10 minutes' and now() + interval '1 minute'
+    and public.can_edit_build(use_case_proposals."buildId")
+    and exists(select 1 from public.creator_profiles c where c.id = use_case_proposals."creatorId" and c."ownerId" = auth.uid())
+    and exists(select 1 from public.builds b where b.id = use_case_proposals."buildId" and b."creatorId" = use_case_proposals."creatorId")
   );
 create policy proposals_withdraw on public.use_case_proposals for delete to authenticated using("proposedBy" = auth.uid() and status = 'pending');
 create policy proposals_admin on public.use_case_proposals for update to authenticated using(public.is_admin()) with check(public.is_admin());
@@ -282,7 +286,7 @@ begin
   perform public.link_use_case_to_build(p."buildId", target_use_case);
   insert into public.use_case_aliases(id,name,"useCaseId",label,"aliasType","normalizedLabel",source,provenance)
   values('alias-proposal-' || p.id, p."originalText", target_use_case, p."originalText", 'original-source',
-         trim(regexp_replace(lower(p."originalText"), '[^a-z0-9]+', ' ', 'g')), 'Proposal ' || p.id, p.provenance)
+         trim(regexp_replace(lower(p."originalText"), '[^a-z0-9]+', ' ', 'g')), 'Proposal ' || p.id, 'community supplied')
   on conflict do nothing;
   insert into public.audit_events(id,name,provenance,"actorId","entityId","entityType",action,at)
   values(gen_random_uuid()::text,'Use Case proposal mapped','verified',auth.uid(),p.id,'use_case_proposals','mapped to ' || target_use_case,now());
@@ -308,7 +312,7 @@ begin
     'createdAt', now(), 'updatedAt', now(), 'provenance', 'community supplied'));
   insert into public.use_case_sources(id,name,"useCaseId","sourceType","sourceEntityId","originalTitle","originalDescription","retrievedAt",attribution,status,provenance)
   values('proposal-source-' || p.id, 'Proposal ' || p.id, new_id, 'solution-provider', p."creatorId", p."originalText", p."suggestedTitle", p."createdAt"::date,
-         'Proposed by a Solution Provider while publishing a Build', 'active', p.provenance);
+         'Proposed by a Solution Provider while publishing a Build', 'active', 'community supplied');
   update public.use_case_proposals set status = 'approved', "resolvedUseCaseId" = new_id, "reviewedBy" = auth.uid(), "reviewedAt" = now() where id = p.id;
   update public.builds set "useCaseProposalId" = null where id = p."buildId" and "useCaseProposalId" = p.id;
   perform public.link_use_case_to_build(p."buildId", new_id);
@@ -333,12 +337,15 @@ end $$;
 
 create or replace function public.merge_use_cases(from_id text, into_id text) returns void
 language plpgsql security definer set search_path='' as $$
-declare f public.use_cases; r record;
+declare f public.use_cases; r record; affected text[];
 begin
   if not public.is_admin() then raise exception 'Moderation requires administrator'; end if;
   if from_id = into_id then raise exception 'A Use Case cannot be merged into itself'; end if;
   select * into f from public.use_cases where id = from_id for update;
-  if not found or not public.use_case_is_public(into_id) then raise exception 'Both Use Cases must exist and the target must be approved'; end if;
+  if not found or not public.use_case_is_public(from_id) or not public.use_case_is_public(into_id) then
+    raise exception 'Both Use Cases must be approved';
+  end if;
+  affected := array(select "buildId" from public.build_use_cases where "useCaseId" = from_id);
   for r in select * from public.build_use_cases where "useCaseId" = from_id loop
     if exists(select 1 from public.build_use_cases where "buildId" = r."buildId" and "useCaseId" = into_id) then
       delete from public.build_use_cases where "buildId" = r."buildId" and "useCaseId" = from_id;
@@ -347,6 +354,11 @@ begin
       update public.build_use_cases set "useCaseId" = into_id where "buildId" = r."buildId" and "useCaseId" = from_id;
     end if;
   end loop;
+  -- Keep order contiguous with the primary first (sortOrder 0..n-1).
+  update public.build_use_cases u set "sortOrder" = o.rn - 1
+  from (select "buildId", "useCaseId", row_number() over (partition by "buildId" order by (role = 'primary') desc, "sortOrder") as rn
+        from public.build_use_cases where "buildId" = any(affected)) o
+  where u."buildId" = o."buildId" and u."useCaseId" = o."useCaseId";
   update public.use_case_sources set "useCaseId" = into_id where "useCaseId" = from_id;
   update public.use_case_aliases a set "useCaseId" = into_id where a."useCaseId" = from_id
     and not exists(select 1 from public.use_case_aliases b where b."useCaseId" = into_id and b."normalizedLabel" = a."normalizedLabel");
@@ -358,10 +370,25 @@ begin
   insert into public.use_case_redirects(id,name,"fromSlug","targetType",target,reason)
   values(coalesce(f.data->>'slug', from_id), coalesce(f.data->>'slug', from_id), coalesce(f.data->>'slug', from_id), 'use-case', into_id, 'merged')
   on conflict (id) do update set target = excluded.target, reason = 'merged';
+  -- Earlier merges into from_id now point at into_id, so old URLs keep resolving.
+  update public.use_case_redirects set target = into_id where "targetType" = 'use-case' and target = from_id;
+  update public.use_cases set data = data || jsonb_build_object('mergedIntoId', into_id) where data->>'mergedIntoId' = from_id;
   insert into public.audit_events(id,name,provenance,"actorId","entityId","entityType",action,at)
   values(gen_random_uuid()::text,'Use Case merged','verified',auth.uid(),from_id,'use_cases','merged into ' || into_id,now());
 end $$;
 
+create or replace function public.archive_use_case(target text) returns void
+language plpgsql security definer set search_path='' as $$
+begin
+  if not public.is_admin() then raise exception 'Moderation requires administrator'; end if;
+  update public.use_cases set published = false, data = data || jsonb_build_object('status','archived','updatedAt',now()) where id = target;
+  if not found then raise exception 'Use Case not found'; end if;
+  insert into public.audit_events(id,name,provenance,"actorId","entityId","entityType",action,at)
+  values(gen_random_uuid()::text,'Use Case archived','verified',auth.uid(),target,'use_cases','archived',now());
+end $$;
+
+revoke execute on function public.archive_use_case(text) from public, anon;
+grant execute on function public.archive_use_case(text) to authenticated;
 revoke execute on function public.map_use_case_proposal(text,text,text) from public, anon;
 revoke execute on function public.approve_use_case_proposal(text,text,text,text,text) from public, anon;
 revoke execute on function public.reject_use_case_proposal(text,text) from public, anon;

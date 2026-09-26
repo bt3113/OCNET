@@ -52,7 +52,8 @@ function UseCaseDiscovery({ market }: { market: MarketplaceState }) {
   const categories = market.categories.filter((category) => category.level === "category").sort((a, b) => a.sortOrder - b.sortOrder);
   const subcategories = market.categories.filter((category) => category.level === "subcategory" && (!get("category") || category.parentId === get("category")));
   const q = get("q");
-  const matched = q ? new Set(suggestUseCases(q, market, { limit: 200 }).map((item) => item.useCase.id)) : null;
+  const ranking = q ? suggestUseCases(q, market, { limit: 200 }).map((item) => item.useCase.id) : null;
+  const matched = ranking ? new Set(ranking) : null;
   const rows = approved
     .filter((useCase) => !matched || matched.has(useCase.id))
     .filter((useCase) => !get("category") || useCase.categoryId === get("category"))
@@ -77,7 +78,7 @@ function UseCaseDiscovery({ market }: { market: MarketplaceState }) {
         case "name":
           return a.name.localeCompare(b.name);
         default:
-          return matched ? 0 : sb.builds.length - sa.builds.length || sb.implementations.length - sa.implementations.length || a.name.localeCompare(b.name);
+          return ranking ? ranking.indexOf(a.id) - ranking.indexOf(b.id) : sb.builds.length - sa.builds.length || sb.implementations.length - sa.implementations.length || a.name.localeCompare(b.name);
       }
     });
   const active = ["q", "category", "subcategory", "builds", "evidence", "technology", "origin"].filter((key) => get(key));

@@ -38,7 +38,10 @@ describe("Build marketplace domain", () => {
     ).toBeGreaterThan(1);
   });
   it("remixes preserve attribution and structure without copying media or public status", () => {
-    const b = remixBuild(builds[0], "other", "new-creator", "Alex");
+    const b = remixBuild({ ...builds[0], useCaseProposalId: "parent-proposal", blueprintId: "parent-blueprint" }, "other", "new-creator", "Alex");
+    // The remix never inherits the source's pending proposal or Blueprint link.
+    expect(b.useCaseProposalId).toBeNull();
+    expect(b.blueprintId).toBeNull();
     expect(b.forkedFromBuildId).toBe(builds[0].id);
     expect(b.media).toEqual([]);
     expect(b.publication).toBe("draft");

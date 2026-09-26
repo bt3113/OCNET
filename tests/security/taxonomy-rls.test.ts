@@ -167,4 +167,63 @@ describe("indexing and merges", () => {
     await as(owner);
     await expect(db.exec(`select public.merge_use_cases('chase','plan')`)).rejects.toThrow(/administrator/);
   });
+  it("merging keeps order contiguous with the primary first", async () => {
+    await as(owner);
+    await saveBuild(buildDoc("b6", owner, "owner-creator", ["reconcile", "plan", "chase"]));
+    await asAdmin();
+    await db.exec(`select public.merge_use_cases('reconcile','chase')`);
+    expect(await rows<{ id: string; role: string; o: number }>(`select "useCaseId" id, role, "sortOrder" o from public.build_use_cases where "buildId"='b6' order by "sortOrder"`)).toEqual([
+      { id: "chase", role: "primary", o: 0 },
+      { id: "plan", role: "secondary", o: 1 },
+    ]);
+  });
+  it("chained merges keep old slugs resolving and refuse to merge a merged Use Case", async () => {
+    await asAdmin();
+    await expect(db.exec(`select public.merge_use_cases('send','plan')`)).rejects.toThrow(/must be approved/);
+    await db.exec(`select public.merge_use_cases('chase','plan')`);
+    expect((await rows<{ t: string }>(`select target t from public.use_case_redirects where "fromSlug"='send'`))[0].t).toBe("plan");
+    expect((await rows<{ m: string }>(`select data->>'mergedIntoId' m from public.use_cases where id='send'`))[0].m).toBe("plan");
+  });
+});
+
+describe("hardening", () => {
+  it("rejects forged proposal provenance, dates, or a creator that does not own the Build", async () => {
+    await as(owner);
+    await saveBuild(buildDoc("b7", owner, "owner-creator", ["plan"]));
+    const insert = (extraCols: string, extraVals: string) =>
+      db.exec(`insert into public.use_case_proposals(id,"buildId","creatorId","originalText","suggestedTitle"${extraCols}) values('p9','b7','owner-creator','forged proposal text','Forged proposal title'${extraVals})`);
+    await expect(insert(",provenance", ",'verified'")).rejects.toThrow();
+    await expect(insert(',"createdAt"', ",'2001-01-01'")).rejects.toThrow();
+    await asAdmin();
+    await db.exec(`insert into public.creator_profiles(id,slug,name,"ownerId") values('owner-second','owner-second','Owner Second','${owner}')`);
+    await as(owner);
+    await expect(db.exec(`insert into public.use_case_proposals(id,"buildId","creatorId","originalText","suggestedTitle") values('p10','b7','owner-second','mismatched creator text','Mismatched creator title')`)).rejects.toThrow();
+  });
+  it("approval and mapping record their own provenance, never the proposer's", async () => {
+    await as(owner);
+    await db.exec(`insert into public.use_case_proposals(id,"buildId","creatorId","originalText","suggestedTitle") values('p11','b7','owner-creator','track field service jobs','Track field service jobs')`);
+    await asAdmin();
+    const [{ id }] = await rows<{ id: string }>(`select public.approve_use_case_proposal('p11','Track field service jobs','Schedule and follow field service jobs to completion.','finance','fin-ar') id`);
+    expect((await rows<{ p: string }>(`select provenance p from public.use_case_sources where "useCaseId"='${id}'`))[0].p).toBe("community supplied");
+  });
+  it("hides a Build's pending proposal id from people who cannot edit it", async () => {
+    await as(owner);
+    await saveBuild(buildDoc("b8", owner, "owner-creator", ["plan"]));
+    await db.exec(`insert into public.use_case_proposals(id,"buildId","creatorId","originalText","suggestedTitle") values('p12','b8','owner-creator','a private proposal text','A private proposal title')`);
+    await saveBuild(buildDoc("b8", owner, "owner-creator", ["plan"], { useCaseProposalId: "p12" }));
+    expect((await rows<{ d: Record<string, unknown> }>(`select public.build_document('b8') d`))[0].d.useCaseProposalId).toBe("p12");
+    await asAdmin();
+    await db.exec(`update public.builds set publication='published', moderation='approved', visibility='public' where id='b8'`);
+    await as("", "anon");
+    const doc = (await rows<{ d: Record<string, unknown> }>(`select public.build_document('b8') d`))[0].d;
+    expect(doc.name).toBe("Build b8 name");
+    expect("useCaseProposalId" in doc).toBe(false);
+  });
+  it("archiving is an administrator action that unpublishes the Use Case", async () => {
+    await as(owner);
+    await expect(db.exec(`select public.archive_use_case('plan')`)).rejects.toThrow(/administrator/);
+    await asAdmin();
+    await db.exec(`select public.archive_use_case('plan')`);
+    expect((await rows<{ p: boolean; s: string }>(`select published p, data->>'status' s from public.use_cases where id='plan'`))[0]).toEqual({ p: false, s: "archived" });
+  });
 });

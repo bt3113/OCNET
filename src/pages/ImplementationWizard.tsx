@@ -66,7 +66,9 @@ export default function ImplementationWizard() {
     try {
       const stored = localStorage.getItem(draftKey);
       const base = stored ? { ...emptyDraft, ...(JSON.parse(stored) as Partial<ContributionDraft>) } : emptyDraft;
-      return buildParam ? { ...base, sourceBuildId: buildParam } : base;
+      // Starting from a Build begins a fresh draft unless the saved one is for the same Build.
+      if (buildParam && base.sourceBuildId !== buildParam) return { ...emptyDraft, sourceBuildId: buildParam };
+      return base;
     } catch {
       return buildParam ? { ...emptyDraft, sourceBuildId: buildParam } : emptyDraft;
     }

@@ -143,7 +143,14 @@ function BuildEditor({ initial }: { initial: Build }) {
   const market = useMarketplace();
   const creator = market.creators.find((item) => item.id === draft.creatorId);
   const providerName = creator?.name ?? "";
-  const proposal = market.proposals.find((item) => item.id === draft.useCaseProposalId && item.status === "pending");
+  // The pending proposal is looked up by Build, not only by the draft's (debounced) link,
+  // so a lost autosave or a moderator's decision never leaves it orphaned or stale.
+  const proposal = market.proposals.find((item) => item.buildId === draft.id && item.status === "pending");
+  const proposalLink = proposal?.id ?? null;
+  useEffect(() => {
+    if (market.isLoading || (draft.useCaseProposalId ?? null) === proposalLink) return;
+    setDraft((current) => ({ ...current, useCaseProposalId: proposalLink, updatedAt: new Date().toISOString() }));
+  }, [market.isLoading, draft.useCaseProposalId, proposalLink]);
   const ownBlueprints = market.blueprints.filter(
     (blueprint) => blueprint.buildId === draft.id || blueprint.maintainerId === draft.creatorId || blueprint.id === draft.blueprintId,
   );
@@ -241,7 +248,7 @@ function BuildEditor({ initial }: { initial: Build }) {
     }
   }
   async function propose(input: ProposalInput) {
-    if (!canPropose(draft)) {
+    if (!canPropose({ ...draft, useCaseProposalId: proposalLink })) {
       notify("A Build can have one proposed Use Case, within its three Use Case slots.");
       return;
     }
@@ -258,7 +265,7 @@ function BuildEditor({ initial }: { initial: Build }) {
       suggestedSubcategoryId: input.suggestedSubcategoryId,
       status: "pending",
       createdAt: new Date().toISOString(),
-      provenance: isSupabase ? "creator supplied" : "demo",
+      provenance: isSupabase ? "community supplied" : "demo",
     };
     try {
       await actions.save("use_case_proposals", record);
@@ -269,13 +276,13 @@ function BuildEditor({ initial }: { initial: Build }) {
     }
   }
   async function withdrawProposal() {
-    if (!draft.useCaseProposalId) return;
+    if (!proposal) return;
     try {
-      await actions.remove("use_case_proposals", draft.useCaseProposalId);
+      await actions.remove("use_case_proposals", proposal.id);
     } catch {
       return;
     }
-    update({ useCaseProposalId: undefined });
+    update({ useCaseProposalId: null });
     notify("Proposal withdrawn");
   }
   async function doImport() {
@@ -689,7 +696,7 @@ function BuildEditor({ initial }: { initial: Build }) {
                 </p>
                 <label>
                   Linked Blueprint
-                  <select value={draft.blueprintId ?? ""} onChange={(e) => update({ blueprintId: e.target.value || undefined })}>
+                  <select value={draft.blueprintId ?? ""} onChange={(e) => update({ blueprintId: e.target.value || null })}>
                     <option value="">No Blueprint linked</option>
                     {ownBlueprints.map((blueprint) => (
                       <option key={blueprint.id} value={blueprint.id}>

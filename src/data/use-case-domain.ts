@@ -220,8 +220,13 @@ export type UseCaseResolution =
 export function resolveUseCase(slug: string, useCases: UseCase[], redirects: UseCaseRedirect[], categories: UseCaseCategory[]): UseCaseResolution {
   const direct = useCases.find((useCase) => useCase.slug === slug || useCase.id === slug);
   if (direct?.status === "merged" && direct.mergedIntoId) {
-    const target = useCases.find((useCase) => useCase.id === direct.mergedIntoId);
-    if (target) return { kind: "redirect", to: `/use-cases/${target.slug}` };
+    // Follow chained merges (a → b → c) to the surviving Use Case.
+    let target = useCases.find((useCase) => useCase.id === direct.mergedIntoId);
+    for (let hops = 0; target?.status === "merged" && target.mergedIntoId && hops < 10; hops++) {
+      const next: string = target.mergedIntoId;
+      target = useCases.find((useCase) => useCase.id === next);
+    }
+    if (target && isApprovedUseCase(target)) return { kind: "redirect", to: `/use-cases/${target.slug}` };
   }
   if (direct && isApprovedUseCase(direct)) return { kind: "found", useCase: direct };
   const redirect = redirects.find((item) => item.fromSlug === slug);
@@ -258,9 +263,14 @@ const now = () => new Date().toISOString();
 
 function attachToBuild(build: Build | undefined, useCaseId: string): Build | undefined {
   if (!build) return undefined;
-  const ids = build.useCaseIds.includes(useCaseId) ? build.useCaseIds : [...build.useCaseIds, useCaseId].slice(0, MAX_USE_CASES_PER_BUILD);
-  return { ...build, useCaseIds: ids, useCaseProposalId: undefined, updatedAt: now() };
+  if (!build.useCaseIds.includes(useCaseId) && build.useCaseIds.length >= MAX_USE_CASES_PER_BUILD)
+    throw new Error(`The Build already has ${MAX_USE_CASES_PER_BUILD} Use Cases. Ask the provider to remove one first.`);
+  const ids = build.useCaseIds.includes(useCaseId) ? build.useCaseIds : [...build.useCaseIds, useCaseId];
+  return { ...build, useCaseIds: ids, useCaseProposalId: null, updatedAt: now() };
 }
+
+/** Records written by moderation carry the platform's provenance, never a value supplied by the proposer. */
+const moderatedProvenance = (proposal: UseCaseProposal) => (proposal.provenance === "demo" ? "demo" : "community supplied");
 
 /** The proposal describes an existing Use Case: link the Build to it and keep the proposal as provenance. */
 export function mapProposal(proposal: UseCaseProposal, target: UseCase, build: Build | undefined, reviewerId: string, note = ""): ModerationResult {
@@ -278,7 +288,7 @@ export function mapProposal(proposal: UseCaseProposal, target: UseCase, build: B
         normalizedLabel: normalizeLabel(proposal.originalText),
         language: "en",
         source: `Proposal ${proposal.id}`,
-        provenance: proposal.provenance,
+        provenance: moderatedProvenance(proposal),
       },
     ],
     auditAction: "use-case-proposal-mapped",
@@ -314,7 +324,7 @@ export function approveProposal(
     createdBy: proposal.proposedBy,
     createdAt: now(),
     updatedAt: now(),
-    provenance: proposal.provenance,
+    provenance: moderatedProvenance(proposal),
   };
   return {
     useCase,
@@ -333,7 +343,7 @@ export function approveProposal(
         retrievedAt: proposal.createdAt,
         attribution: "Proposed by a Solution Provider while publishing a Build",
         status: "active",
-        provenance: proposal.provenance,
+        provenance: moderatedProvenance(proposal),
       },
     ],
     aliases:
@@ -349,7 +359,7 @@ export function approveProposal(
               normalizedLabel: normalizeLabel(proposal.originalText),
               language: "en",
               source: `Proposal ${proposal.id}`,
-              provenance: proposal.provenance,
+              provenance: moderatedProvenance(proposal),
             },
           ],
     auditAction: "use-case-proposal-approved",
@@ -359,7 +369,7 @@ export function approveProposal(
 export function rejectProposal(proposal: UseCaseProposal, build: Build | undefined, reviewerId: string, note: string): ModerationResult {
   return {
     proposal: { ...proposal, status: "rejected", reviewedBy: reviewerId, reviewedAt: now(), reviewNote: note },
-    build: build ? { ...build, useCaseProposalId: undefined, updatedAt: now() } : undefined,
+    build: build ? { ...build, useCaseProposalId: null, updatedAt: now() } : undefined,
     sources: [],
     aliases: [],
     auditAction: "use-case-proposal-rejected",

@@ -147,7 +147,7 @@ export default function ImplementationCompare() {
             <Row label="Evidence freshness">{selected.map((record) => <StalenessBadge key={record.id} state={implementationFreshness(record, now).state} />)}</Row>
             <Row label="Implementer">{selected.map((record) => {
               const partners = data.implementers.filter((partner) => record.implementerIds.includes(partner.id));
-              return partners.length ? partners.map((partner) => <Link key={partner.id} to={providerForImplementer(solutionProviderList, partner.id) ? `/solution-providers/${providerForImplementer(solutionProviderList, partner.id)!.slug}` : `/implementers/${partner.slug}`}>{partner.name}</Link>) : <Missing kind="missing" />;
+              return partners.length ? partners.map((partner) => <Link key={partner.id} to={providerForImplementer(solutionProviderList, partner.id) ? `/solution-providers/${providerForImplementer(solutionProviderList, partner.id)!.slug}` : `/solution-providers`}>{partner.name}</Link>) : <Missing kind="missing" />;
             })}</Row>
             <Row label="Known limitations">{selected.map((record) => record.knownLimitations ?? <Missing kind="missing" />)}</Row>
           </tbody>
