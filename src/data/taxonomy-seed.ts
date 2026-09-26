@@ -19,6 +19,7 @@ const tree: [id: string, name: string, description: string, children: [id: strin
   ["finance", "Finance", "Money in, money out and financial records.", [
     ["fin-ar", "Accounts Receivable", "Invoicing customers and collecting payment."],
     ["fin-ap", "Accounts Payable", "Receiving, checking and paying supplier invoices."],
+    ["fin-analysis", "Financial Analysis", "Analyzing financial reports, filings and models."],
   ]],
   ["software-development", "Software Development", "Building, changing and maintaining software.", [
     ["sd-coding", "Coding & Change Management", "Planning and making code changes."],
@@ -43,6 +44,8 @@ const tree: [id: string, name: string, description: string, children: [id: strin
   ]],
   ["data-analytics", "Data & Analytics", "Turning data into decisions.", [
     ["an-reporting", "Reporting & Insights", "Reports, dashboards and analysis."],
+    ["an-research", "Research & Synthesis", "Combining evidence from multiple sources into structured findings."],
+    ["an-market-intelligence", "Market Intelligence", "Monitoring external news, market signals and competitive developments."],
   ]],
 ];
 
@@ -133,6 +136,9 @@ export const editorialAliases: UseCaseAlias[] = [
   alias("plan-and-implement-code-changes", "AI coding agent", "hidden-search"),
   alias("plan-and-implement-code-changes", "code change automation", "hidden-search"),
   alias("trace-errors-to-their-root-cause", "root cause analysis", "hidden-search"),
+  alias("synthesize-research-across-sources", "research synthesis", "hidden-search"),
+  alias("monitor-news-and-market-signals", "market monitoring", "hidden-search"),
+  alias("analyze-financial-data-and-filings", "financial filing analysis", "hidden-search"),
   alias("document-data-extraction", "invoice parsing", "hidden-search"),
   alias("document-data-extraction", "OCR data extraction", "hidden-search"),
   ...Object.entries({

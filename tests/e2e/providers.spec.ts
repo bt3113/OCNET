@@ -10,8 +10,10 @@ test("xAI is a Technology Vendor whose statements are sourced Use Cases", async 
   await expect(page.getByRole("note").filter({ hasText: "has not reviewed this profile" })).toBeVisible();
   const tabs = page.getByRole("tablist", { name: "xAI profile sections" });
   await expect(tabs.getByRole("tab", { name: /Vendor-stated Use Cases/ })).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator(".vendor-use-case-list > li")).toHaveCount(11);
+  await expect(page.locator(".vendor-use-case-list > li")).toHaveCount(15);
   await expect(page.locator("main")).toContainText("These are vendor statements, not Builds");
+  await expect(page.locator("main")).toContainText("Synthesize research across sources");
+  await expect(page.locator("main")).toContainText("Edit and restyle existing images");
   await expect(tabs.getByRole("tab", { name: /Independent Builds/ })).toBeVisible();
 
   await tabs.getByRole("tab", { name: /Products/ }).click();
@@ -23,17 +25,20 @@ test("xAI is a Technology Vendor whose statements are sourced Use Cases", async 
   await expect(page.locator("main")).toContainText("does not let the vendor delete or rewrite independent Builds");
 });
 
-test("a vendor-origin Use Case keeps attribution and the original statement", async ({ page }) => {
+test("a vendor-origin Use Case keeps attribution and live source wording", async ({ page }) => {
   await page.goto(`${base}/use-cases/handle-customer-inquiries-with-voice-agents`);
-  await expect(page.locator("main h1")).toHaveText("Handle customer inquiries with voice agents");
+  await expect(page.locator("main h1")).toHaveText("Automate workflows with voice agents");
   const origin = page.locator(".use-case-origin");
   await expect(origin).toContainText("Originally listed by xAI");
-  await expect(origin.getByRole("link", { name: "source" })).toHaveAttribute("href", "https://x.ai/grok/use-cases");
+  await expect(origin.getByRole("link", { name: "source" })).toHaveAttribute("href", "https://x.ai/grok/use-cases/voice-agents");
   await expect(origin).toContainText("does not own it");
   await page.getByRole("tab", { name: /Sources/ }).click();
-  await expect(page.locator(".source-provenance")).toContainText("Technology vendor · xAI");
-  await expect(page.locator(".source-provenance")).toContainText("Retrieved");
-  await expect(page.locator(".source-provenance")).toContainText("Wording to be verified");
+  const source = page.locator(".source-provenance");
+  await expect(source).toContainText("Technology vendor · xAI");
+  await expect(source).toContainText("Original title: “Automate workflows with voice agents”");
+  await expect(source).toContainText("Verified against the live xAI use-case index");
+  await expect(source).not.toContainText("Wording to be verified");
+  await expect(source.getByRole("link", { name: "Open source page" })).toHaveAttribute("href", "https://x.ai/grok/use-cases/voice-agents");
 });
 
 test("legacy xAI URLs redirect to the new concepts", async ({ page }) => {
@@ -41,7 +46,7 @@ test("legacy xAI URLs redirect to the new concepts", async ({ page }) => {
   await expect(page).toHaveURL(/\/technology-vendors\/xai$/);
   await page.goto(`${base}/builds/xai-voice-customer-support`);
   await expect(page).toHaveURL(/\/use-cases\/handle-customer-inquiries-with-voice-agents$/);
-  await expect(page.locator("main h1")).toHaveText("Handle customer inquiries with voice agents");
+  await expect(page.locator("main h1")).toHaveText("Automate workflows with voice agents");
   // A broad vendor area became a category, not a Use Case.
   await page.goto(`${base}/use-cases/software-development`);
   await expect(page).toHaveURL(/\/use-cases\?category=/);

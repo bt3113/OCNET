@@ -24,7 +24,7 @@ import {
 } from "../src/data/use-case-domain";
 import { solutionProviders, findSolutionProvider } from "../src/data/solution-providers";
 import { titleGuidance, tidyTitle } from "../src/data/use-case-text";
-import { XAI_PROVIDER_ID, XAI_USE_CASES_URL, xaiLegacyBuildRedirects } from "../src/data/vendor-xai";
+import { XAI_PROVIDER_ID, xaiLegacyBuildRedirects } from "../src/data/vendor-xai";
 
 const useCases = seed.use_cases!;
 const aliases = seed.use_case_aliases!;
@@ -169,10 +169,12 @@ describe("xAI is a Technology Vendor with sourced Use Cases, not Builds", () => 
   });
   it("keeps vendor provenance on every xAI Use Case", () => {
     const vendorCases = useCases.filter((useCase) => useCase.originType === "technology-vendor-sourced");
-    expect(vendorCases).toHaveLength(11);
+    expect(vendorCases).toHaveLength(15);
     for (const useCase of vendorCases) {
       const source = seed.use_case_sources!.find((item) => item.useCaseId === useCase.id && item.sourceType === "technology-vendor");
-      expect(source, useCase.id).toMatchObject({ sourceEntityId: XAI_PROVIDER_ID, sourceUrl: XAI_USE_CASES_URL, retrievedAt: "2026-09-26" });
+      expect(source, useCase.id).toMatchObject({ sourceEntityId: XAI_PROVIDER_ID, retrievedAt: "2026-09-26", lastCheckedAt: "2026-09-26", status: "active" });
+      expect(source!.sourceUrl).toMatch(/^https:\/\/x\.ai\/grok\/use-cases\/[a-z0-9-]+$/);
+      expect(source!.originalTitle).toBe(useCase.name);
       expect(source!.originalDescription.length).toBeGreaterThan(20);
       expect(useCase.categoryId && useCase.subcategoryId).toBeTruthy();
     }

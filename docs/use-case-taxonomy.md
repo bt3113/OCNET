@@ -10,14 +10,16 @@ Two levels of grouping, then the Use Case itself:
 | --- | --- |
 | Customer Service | Inbound Enquiries (`cs-inbound-enquiries`), Bookings & Reservations (`cs-bookings`), Support (`cs-support`), Voice (`cs-voice`) |
 | Sales | Lead Management (`sales-lead-management`) |
-| Finance | Accounts Receivable (`fin-ar`), Accounts Payable (`fin-ap`) |
+| Finance | Accounts Receivable (`fin-ar`), Accounts Payable (`fin-ap`), Financial Analysis (`fin-analysis`) |
 | Software Development | Coding & Change Management (`sd-coding`), Debugging & Reliability (`sd-debugging`), Documentation (`sd-documentation`) |
 | Marketing | Content Creation (`mk-content`), Campaigns (`mk-campaigns`), Visual Content (`mk-visual`), Localization (`mk-localization`) |
 | Operations | Document Processing (`ops-documents`), Internal Assistants & Automation (`ops-internal-tools`), Quality (`ops-quality`), Warehouse & Logistics (`ops-warehouse`), Facilities (`ops-facilities`) |
 | Commerce | Online Store (`com-online-store`) |
-| Data & Analytics | Reporting (`an-reporting`) |
+| Data & Analytics | Reporting (`an-reporting`), Research & Synthesis (`an-research`), Market Intelligence (`an-market-intelligence`) |
 
 Source: `src/data/taxonomy-seed.ts` (editorial, provenance `inferred`). Connected mode: `use_case_categories`.
+
+The category/subcategory path is Oracnet editorial structure. A vendor-sourced Use Case keeps the vendor's original title and source separately; placing it under a category does not imply the vendor chose or endorsed Oracnet's taxonomy.
 
 ## Writing a Use Case title
 
@@ -39,7 +41,7 @@ Advice (shown; moderation decides):
 
 A tidied suggestion (sentence case, punctuation noise removed) is offered but never applied silently.
 
-Good: “Chase overdue invoices”, “Review supplier invoices before approval”, “Handle customer inquiries with voice agents”.
+Good: “Chase overdue invoices”, “Review supplier invoices before approval”, “Automate workflows with voice agents”.
 Not a Use Case: “Software development” (an area, so a category), “Grok for business” (a product), “AI automation” (too broad).
 
 ## Aliases
@@ -52,6 +54,8 @@ Not a Use Case: “Software development” (an area, so a category), “Grok for
 | `original-source` | No | Yes | A provider's proposal wording or a vendor's original wording |
 
 Hidden and original-source labels match in search and in the publisher's suggestions, but the UI shows the matched Use Case title, never the hidden label.
+
+For a vendor-sourced Use Case whose current public title is already the vendor's live title, `UseCaseSource.originalTitle` is the source of truth. Earlier Oracnet-normalised titles remain `alternate` aliases rather than replacing the vendor title.
 
 ## Suggestions (deterministic)
 

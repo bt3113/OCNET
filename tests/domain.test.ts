@@ -48,10 +48,15 @@ describe("catalogue integrity", () => {
       }
     for (const stack of xaiRelatedStacks) expect(stack.provenance).toBe("inferred");
     expect(xaiProvider.listing?.sources.every((source) => source.url.startsWith("https://"))).toBe(true);
+    expect(xaiProvider.listing?.sources.some((source) => source.url === XAI_USE_CASES_URL)).toBe(true);
     for (const product of xaiProducts) expect(product.sourceUrl).toMatch(/^https:\/\//);
+    expect(xaiUseCases).toHaveLength(15);
+    expect(xaiUseCaseSources).toHaveLength(15);
     for (const source of xaiUseCaseSources) {
-      expect(source.sourceUrl).toBe(XAI_USE_CASES_URL);
-      expect(source.captureMethod).toMatch(/verify/);
+      expect(source.sourceUrl).toMatch(/^https:\/\/x\.ai\/grok\/use-cases\/[a-z0-9-]+$/);
+      expect(source.captureMethod).toMatch(/Verified against the live xAI use-case index/);
+      expect(source.originalTitle?.length).toBeGreaterThan(3);
+      expect(source.status).toBe("active");
       expect(source.originalDescription).not.toMatch(/caused|resulted in/i);
     }
   });
