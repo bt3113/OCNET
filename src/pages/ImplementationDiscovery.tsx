@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Scale, Search, SlidersHorizontal, X } from "lucide-react";
 import { PageHeading } from "../components/layout";
 import { Drawer, EmptyState, ErrorState, Skeleton } from "../components/ui";
-import { EvidencePrincipleNotice, ImplementationCard } from "../components/intelligence";
+import { ImplementationCard } from "../components/intelligence";
 import { isPublicRecord, useIntelligence } from "../data/intelligence-hooks";
 import { implementationFreshness } from "../data/staleness";
 import { compareContexts, contextFromImplementation } from "../data/context-similarity";
@@ -142,32 +142,36 @@ export default function ImplementationDiscovery() {
       {children}
     </fieldset>
   );
+  const secondary = ["business", "size", "similarTo", "implementer", "blueprint", "evidence", "reviewed", "freshness", "ongoing", "duration"];
   const filters = (
     <div className="implementation-filters">
-      {group("Outcome & context", <>
+      {group("Most used", <>
         {select("useCase", "Use case", data.useCases.filter((useCase) => data.useCaseLinks.some((link) => link.useCaseId === useCase.id)).map((useCase) => [useCase.id, useCase.name]))}
         {select("industry", "Industry", distinct(publicRecords.map((record) => record.industry)).map((value) => [value, value]))}
-        {select("business", "Business type", distinct(publicRecords.map((record) => record.businessType)).map((value) => [value, value]))}
-        {select("size", "Organization size", distinct(publicRecords.map((record) => record.organizationSizeBand)).map((value) => [value, value]))}
         {select("region", "Region", distinct(publicRecords.map((record) => record.region)).map((value) => [value, value]))}
-        {select("similarTo", "Similar context to", publicRecords.map((record) => [record.id, record.name]))}
-      </>)}
-      {group("Architecture & people", <>
         {select("tech", "Technology", technologies.map((id) => [id, data.products.find((product) => product.id === id)?.name ?? id]))}
-        {select("implementer", "Implementer", data.implementers.filter((partner) => publicRecords.some((record) => record.implementerIds.includes(partner.id))).map((partner) => [partner.id, partner.name]))}
-        {check("blueprint", "Reusable Blueprint available")}
-      </>)}
-      {group("Evidence", <>
-        {select("evidence", "Evidence method", (Object.keys(evidenceLevelInfo) as EvidenceLevel[]).map((level) => [level, evidenceLevelInfo[level].label]))}
-        {check("attested", "Has customer-attested claims")}
-        {check("reviewed", "Has evidence-reviewed claims")}
-        {select("freshness", "Freshness", [["current", "Current"], ["review-due", "Review due"], ["stale", "Stale"], ["unknown", "Unknown"]])}
-      </>)}
-      {group("Economics", <>
         {select("cost", "Setup cost", [["under-1k", "Under £1k"], ["1k-3k", "£1k–£3k"], ["3k-6k", "£3k–£6k"], ["over-6k", "Over £6k"], ["undisclosed", "Not disclosed"]])}
-        {select("ongoing", "Ongoing cost / month", [["under-200", "Under £200"], ["200-500", "£200–£500"], ["over-500", "Over £500"]])}
-        {select("duration", "Implementation duration", [["up-to-2", "Up to 2 weeks"], ["3-5", "3–5 weeks"], ["over-5", "Over 5 weeks"]])}
+        {check("attested", "Has customer-attested claims")}
       </>)}
+      <details className="more-filters" open={secondary.some((key) => params.get(key)) || undefined}>
+        <summary>More filters</summary>
+        {group("Context", <>
+          {select("business", "Business type", distinct(publicRecords.map((record) => record.businessType)).map((value) => [value, value]))}
+          {select("size", "Organization size", distinct(publicRecords.map((record) => record.organizationSizeBand)).map((value) => [value, value]))}
+          {select("similarTo", "Similar context to", publicRecords.map((record) => [record.id, record.name]))}
+        </>)}
+        {group("Delivery", <>
+          {select("implementer", "Implementer", data.implementers.filter((partner) => publicRecords.some((record) => record.implementerIds.includes(partner.id))).map((partner) => [partner.id, partner.name]))}
+          {check("blueprint", "Reusable Blueprint available")}
+          {select("ongoing", "Ongoing cost / month", [["under-200", "Under £200"], ["200-500", "£200–£500"], ["over-500", "Over £500"]])}
+          {select("duration", "Implementation duration", [["up-to-2", "Up to 2 weeks"], ["3-5", "3–5 weeks"], ["over-5", "Over 5 weeks"]])}
+        </>)}
+        {group("Evidence", <>
+          {select("evidence", "Evidence method", (Object.keys(evidenceLevelInfo) as EvidenceLevel[]).map((level) => [level, evidenceLevelInfo[level].label]))}
+          {check("reviewed", "Has evidence-reviewed claims")}
+          {select("freshness", "Freshness", [["current", "Current"], ["review-due", "Review due"], ["stale", "Stale"], ["unknown", "Unknown"]])}
+        </>)}
+      </details>
     </div>
   );
 
@@ -176,10 +180,9 @@ export default function ImplementationDiscovery() {
       <PageHeading
         eyebrow="IMPLEMENTATION RECORDS"
         title="See what comparable businesses actually implemented."
-        description="Each record keeps business context, process change, architecture, economics and claim-level evidence together. Demo records are illustrative and do not describe real customers."
+        description="Context, architecture, cost and observed results for each deployment — with evidence on every claim. Observed values, not forecasts."
         action={<Link className="button dark" to="/solution-compiler">Build a requirement profile <ArrowRight size={17} aria-hidden /></Link>}
       />
-      <EvidencePrincipleNotice />
       <div className="discovery-layout">
         <aside className="discovery-filters card" aria-label="Filters">
           <div className="row between"><strong>Filters</strong>{!!active.length && <button type="button" className="text-button" onClick={() => setParams(compare.length ? { compare: compare.join(",") } : {}, { replace: true })}>Clear all</button>}</div>

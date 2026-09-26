@@ -1,3 +1,11 @@
+# QA record — information architecture pass (2026-09-26)
+
+Restructured the UI for scannability: grouped navigation, one demo strip, compact cards, tabbed detail pages, progressive filters and a stepped compiler (see `docs/design-system.md`). Page heights at 1440 px: home 4,458 → 2,071; implementation detail 8,495 → ~2,100 per tab; use case 5,065 → 1,397; compiler results 4,796 → 3,280.
+
+- `npm run lint`, `npm run typecheck`, `npm test` (97) pass; `npm run test:e2e` **53 passed** (three new axe checks on non-default tabs). Detail-page E2E steps now select the relevant tab; they also cover keyboard tab navigation and the `?tab=` URL state.
+- Found and fixed while testing: tab arrow-key navigation could use stale state under rapid key presses; it now moves from the focused tab.
+- Demo browser storage namespace bumped to `oracnet:intel-v3:` because seed summaries changed.
+
 # QA record — implementation intelligence release
 
 Run on 2026-09-25 from `npm ci` with Node 22, Vitest, Playwright (Chromium 1194 via `CHROMIUM_EXECUTABLE_PATH`), axe-core and PGlite.

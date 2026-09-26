@@ -4,11 +4,8 @@ import { ArrowRight, CircleHelp, FileSearch, ListRestart, Search, SlidersHorizon
 import { PageHeading } from "../components/layout";
 import { Badge, ErrorState, Skeleton } from "../components/ui";
 import {
-  CompilerEmptyState,
   ContextSimilarityPanel,
-  IllustrativeNotice,
   ImplementationCard,
-  SectionIntro,
 } from "../components/intelligence";
 import {
   DecisionTraceDrawer,
@@ -47,6 +44,7 @@ export default function SolutionCompiler() {
   const [showDominated, setShowDominated] = useState(false);
   const [order, setOrder] = useState<Order>("default");
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [params] = useSearchParams();
   const handedOff = useRef(false);
   // Intent handed over from the homepage: structure it once, still fully editable.
@@ -98,6 +96,7 @@ export default function SolutionCompiler() {
     if (!profile || !validation?.ok) return;
     const compiled = compileSolutions(profile, data.catalogue);
     setResult(compiled);
+    setEditing(false);
     track("compiler_run_completed", compiled.run.id);
     requestAnimationFrame(() => document.getElementById("compiler-results")?.focus());
   };
@@ -173,15 +172,54 @@ export default function SolutionCompiler() {
         .slice(0, 3)
     : [];
 
+  const collapsed = !!result && !editing;
+  const money = (value: number | null | undefined) => (value == null ? null : `£${value.toLocaleString("en-GB")}`);
+  const summary: [string, string][] = profile
+    ? ([
+        ["Outcome", data.useCases.find((item) => item.id === profile.useCaseId)?.name ?? profile.objective],
+        ["Business", [profile.businessType, profile.locations ? `${profile.locations} locations` : ""].filter(Boolean).join(" · ")],
+        ["Must keep", profile.mustKeepSystems.map((id) => data.products.find((item) => item.id === id)?.name ?? id).join(", ")],
+        ["Setup budget", [money(profile.budgetMin), money(profile.budgetMax)].filter(Boolean).join("–")],
+        ["Team", { none: "No in-house developers", basic: "Basic technical skills", intermediate: "Some development skills", advanced: "Developers in-house" }[profile.technicalCapability]],
+        ["Human approval", profile.humanApprovalRequired ? "Required" : ""],
+      ] as [string, string][]).filter(([, value]) => !!value)
+    : [];
   return (
     <>
       <PageHeading
         eyebrow="SOLUTION COMPILER"
         title="What are you trying to improve?"
-        description="Describe the outcome. Oracnet turns it into requirement cards you confirm and correct, then checks recorded implementations and Blueprints against your hard constraints and shows the trade-offs between feasible approaches."
+        description="Describe the outcome, confirm the requirements, then compare approaches that satisfy your hard constraints."
         action={<Badge>Deterministic · no AI model used</Badge>}
       />
+      <ol className="compiler-stepper" aria-label="Progress">
+        {["Describe the outcome", "Confirm requirements", "Compare approaches"].map((label, index) => {
+          const step = result ? 2 : profile ? 1 : 0;
+          return (
+            <li key={label} className={index === step ? "current" : index < step ? "done" : ""} aria-current={index === step ? "step" : undefined}>
+              <span>{index + 1}</span>
+              {label}
+            </li>
+          );
+        })}
+      </ol>
 
+      {collapsed && profile ? (
+        <section className="card requirement-summary" aria-labelledby="requirement-summary-title">
+          <div className="row between wrap">
+            <h2 id="requirement-summary-title" className="tab-section-title">Your requirement</h2>
+            <button type="button" className="button light" onClick={() => setEditing(true)}>
+              <ListRestart size={15} aria-hidden /> Edit requirement
+            </button>
+          </div>
+          <dl className="requirement-summary-list">
+            {summary.map(([label, value]) => (
+              <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+            ))}
+          </dl>
+        </section>
+      ) : (
+      <>
       <section className="compiler-intent card" aria-labelledby="intent-label">
         <div className="compiler-step-label"><span>1</span> Describe the outcome</div>
         <label className="compiler-intent-field" htmlFor="compiler-intent">
@@ -213,9 +251,7 @@ export default function SolutionCompiler() {
         <small className="muted">Text is parsed by deterministic rules in your browser. Nothing is sent to an AI provider.</small>
       </section>
 
-      {!profile ? (
-        <CompilerEmptyState />
-      ) : (
+      {profile && (
         <section className="compiler-requirements card" aria-labelledby="requirements-title">
           <div className="compiler-step-label" id="requirements-title"><span>2</span> Confirm your requirement</div>
           <p className="muted">
@@ -236,42 +272,14 @@ export default function SolutionCompiler() {
           </div>
         </section>
       )}
+      </>
+      )}
 
       {result && profile && (
         <div id="compiler-results" tabIndex={-1} className="compiler-results-region">
           <section className="intelligence-section">
-            <SectionIntro eyebrow="3 · WHAT THE ENGINE DID" title="Structured, reproducible steps" />
-            <SolutionCompilerProgress stages={result.stages} />
-            <IllustrativeNotice>All records, Blueprints, costs and relationships in this demo are illustrative. Use the structure, not the numbers.</IllustrativeNotice>
-          </section>
-
-          <section className="intelligence-section">
-            <SectionIntro eyebrow="4 · COMPARABLE IMPLEMENTATIONS" title="Businesses like yours — and how they differ">
-              Similarity compares context only. It is not a prediction that you will see the same outcome.
-            </SectionIntro>
-            {comparable.length ? (
-              <div className="compiler-comparable-grid">
-                {comparable.map(({ record, similarity }) => (
-                  <div key={record.id} className="comparable-pair">
-                    <ContextSimilarityPanel similarity={similarity} />
-                    <ImplementationCard
-                      implementation={record}
-                      context={data.contexts.find((context) => context.implementationId === record.id)}
-                      metrics={data.metrics.filter((metric) => metric.implementationId === record.id)}
-                      metricDefinitions={data.definitions}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="muted card compiler-none">No published record has a medium or high context match. The approaches below come from Blueprints only.</p>
-            )}
-          </section>
-
-          <section className="intelligence-section">
-            <SectionIntro eyebrow="5 · FEASIBLE APPROACHES" title="Several approaches, visible trade-offs">
-              Labels appear only where recorded data supports them. There is no “best stack”. Change a component to re-check feasibility.
-            </SectionIntro>
+            <div className="compiler-step-label"><span>3</span> Compare feasible approaches</div>
+            <p className="tab-section-note">Labels appear only where recorded data supports them — there is no “best stack”. Change a component to re-check feasibility.</p>
             <div className="compiler-toolbar card">
               <label>
                 Order by (does not change any value)
@@ -317,7 +325,7 @@ export default function SolutionCompiler() {
                 <CircleHelp size={24} aria-hidden />
                 <h3>No approach satisfies every hard constraint.</h3>
                 <p>Oracnet does not quietly drop a requirement to produce an answer. Review the exclusions below, then relax a hard constraint to Soft if that is acceptable.</p>
-                <button type="button" className="button light" onClick={() => document.getElementById("requirements-title")?.scrollIntoView({ behavior: "smooth" })}>
+                <button type="button" className="button light" onClick={() => setEditing(true)}>
                   <ListRestart size={15} aria-hidden /> Edit requirement
                 </button>
               </div>
@@ -326,14 +334,14 @@ export default function SolutionCompiler() {
 
           {nonDominated.length > 1 && (
             <section className="intelligence-section">
-              <SectionIntro eyebrow="6 · TRADE-OFFS" title="Compare the non-dominated approaches" />
+              <h2 className="tab-section-title">Trade-offs between the non-dominated approaches</h2>
               <SolutionTradeoffView candidates={nonDominated} />
             </section>
           )}
 
           {!!result.trace.exclusions.length && (
             <section className="intelligence-section">
-              <SectionIntro eyebrow="EXCLUDED" title="What did not appear, and why" />
+              <h2 className="tab-section-title">What did not appear, and why</h2>
               <details className="card excluded-candidates">
                 <summary>{result.trace.exclusions.length} exclusion{result.trace.exclusions.length === 1 ? "" : "s"} recorded</summary>
                 <ul>
@@ -345,6 +353,32 @@ export default function SolutionCompiler() {
             </section>
           )}
 
+          <section className="intelligence-section">
+            <h2 className="tab-section-title">Businesses like yours</h2>
+            <p className="tab-section-note">Similarity compares context only. It is not a prediction that you will see the same outcome.</p>
+            {comparable.length ? (
+              <div className="compiler-comparable-grid">
+                {comparable.map(({ record, similarity }) => (
+                  <div key={record.id} className="comparable-pair">
+                    <ContextSimilarityPanel similarity={similarity} />
+                    <ImplementationCard
+                      implementation={record}
+                      context={data.contexts.find((context) => context.implementationId === record.id)}
+                      metrics={data.metrics.filter((metric) => metric.implementationId === record.id)}
+                      metricDefinitions={data.definitions}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted card compiler-none">No published record has a medium or high context match. The approaches below come from Blueprints only.</p>
+            )}
+          </section>
+
+          <details className="card compiler-method">
+            <summary>How this result was computed</summary>
+            <SolutionCompilerProgress stages={result.stages} />
+          </details>
           <SolutionExplanationDrawer candidate={explain} products={data.products} implementations={data.implementations} onClose={() => setExplain(null)} />
           <DecisionTraceDrawer open={traceOpen} onClose={() => setTraceOpen(false)} result={result} catalogue={data.catalogue} />
         </div>

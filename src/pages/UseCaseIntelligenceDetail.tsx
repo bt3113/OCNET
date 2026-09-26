@@ -1,18 +1,17 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, GitBranch, Layers3, Workflow } from "lucide-react";
 import { PageHeading } from "../components/layout";
 import {
-  Badge,
   Breadcrumbs,
   ButtonLink,
   EmptyState,
   Skeleton,
   StackVisualizer,
+  TabbedSections,
   TechnologyCard,
 } from "../components/ui";
 import {
   BlueprintCard,
-  EvidencePrincipleNotice,
   ImplementationCard,
 } from "../components/intelligence";
 import { useRecords } from "../state";
@@ -22,6 +21,14 @@ import { capabilityLabel } from "../data/taxonomy";
 
 export default function UseCaseIntelligenceDetail() {
   const { slug } = useParams();
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") ?? "records";
+  const selectTab = (id: string) => {
+    const next = new URLSearchParams(params);
+    if (id === "records") next.delete("tab");
+    else next.set("tab", id);
+    setParams(next, { replace: true });
+  };
   const { data: cases = [], isLoading } = useRecords("use_cases");
   const { data: stacks = [] } = useRecords("solution_stacks");
   const { data: products = [] } = useRecords("products");
@@ -70,8 +77,7 @@ export default function UseCaseIntelligenceDetail() {
       <Breadcrumbs items={[{ name: "Use Cases", to: "/use-cases" }, { name: useCase.name }]} />
       <div className="usecase-intelligence-hero">
         <div>
-          <Badge>BUSINESS OUTCOME</Badge>
-          <PageHeading title={useCase.name} description={useCase.description} />
+          <PageHeading eyebrow="BUSINESS OUTCOME" title={useCase.name} description={useCase.description} />
           <h2>{useCase.outcome}</h2>
         </div>
         <div className="card usecase-intelligence-action">
@@ -83,12 +89,15 @@ export default function UseCaseIntelligenceDetail() {
           </ButtonLink>
         </div>
       </div>
-      <EvidencePrincipleNotice />
-
+      <TabbedSections
+        label="Use case sections"
+        active={tab}
+        onChange={selectTab}
+        tabs={[
+          { id: "records", label: "Implementations", count: relatedImplementations.length, content: (<>
       <section className="intelligence-section">
         <div className="section-title-text">
-          <span className="eyebrow">COMPARABLE IMPLEMENTATIONS</span>
-          <h2>How this outcome has been represented in Oracnet.</h2>
+          <h2>Businesses that implemented this outcome</h2>
           <p>{relatedImplementations.length} published record{relatedImplementations.length === 1 ? "" : "s"}. Different businesses chose different architectures for the same outcome.</p>
         </div>
         {relatedImplementations.length >= 2 && (
@@ -112,40 +121,17 @@ export default function UseCaseIntelligenceDetail() {
         )}
       </section>
 
-      <section className="intelligence-section">
-        <div className="section-title-text">
-          <span className="eyebrow">PATTERNS ACROSS RECORDS</span>
-          <h2>Context and metric patterns</h2>
-        </div>
-        <div className="card empty-inline">
+        <p className="tab-section-note">
           {nonDemo.length >= 5
             ? `${nonDemo.length} non-demo records are available; pattern summaries will be shown with their sample size.`
-            : `Not shown: there are ${nonDemo.length} non-demo records for this outcome. Oracnet does not summarise patterns from fewer than five real records or from illustrative data.`}
-        </div>
-      </section>
-
-      {template && (
-        <section className="intelligence-section">
-          <div className="section-title-text">
-            <span className="eyebrow">CAPABILITY MAP</span>
-            <h2>What an approach needs to provide</h2>
-            <p>Capabilities, not vendors. Any product that fills a slot can be evaluated in the Solution Compiler.</p>
-          </div>
-          <div className="capability-map">
-            {template.requiredCapabilities.map((capability) => (
-              <div key={capability} className="card capability-slot required"><small>Required</small><strong>{capabilityLabel(capability)}</strong><span>Satisfied by: {(template.capabilityEquivalents[capability] ?? [capability]).map(capabilityLabel).join(", ")}</span></div>
-            ))}
-            {template.optionalCapabilities.map((capability) => (
-              <div key={capability} className="card capability-slot"><small>Common, optional</small><strong>{capabilityLabel(capability)}</strong></div>
-            ))}
-          </div>
-        </section>
-      )}
-
+            : `Cross-record patterns are not shown: Oracnet needs at least five real (non-illustrative) records for an outcome, and this one has ${nonDemo.length}.`}
+        </p>
+          </>) },
+          { id: "blueprints", label: "Blueprints", count: relatedBlueprints.length, content: (<>
       <section className="intelligence-section">
         <div className="section-title-text">
-          <span className="eyebrow">REFERENCE BLUEPRINTS</span>
-          <h2>Reusable architecture is separate from evidence.</h2>
+          <h2>Reusable Blueprints for this outcome</h2>
+          <p>Sanitized patterns with their own reuse rights. A Blueprint does not inherit any record’s evidence.</p>
         </div>
         <div className="grid three">
           {relatedBlueprints.map((blueprint) => (
@@ -160,10 +146,28 @@ export default function UseCaseIntelligenceDetail() {
         </div>
       </section>
 
+          </>) },
+          { id: "needs", label: "What it needs", content: (<>
+      {template && (
+        <section className="intelligence-section">
+          <div className="section-title-text">
+            <h2>What an approach needs to provide</h2>
+            <p>Capabilities, not vendors. Any product that fills a slot can be evaluated in the Solution Compiler.</p>
+          </div>
+          <div className="capability-map">
+            {template.requiredCapabilities.map((capability) => (
+              <div key={capability} className="card capability-slot required"><small>Required</small><strong>{capabilityLabel(capability)}</strong><span>Satisfied by: {(template.capabilityEquivalents[capability] ?? [capability]).map(capabilityLabel).join(", ")}</span></div>
+            ))}
+            {template.optionalCapabilities.map((capability) => (
+              <div key={capability} className="card capability-slot"><small>Common, optional</small><strong>{capabilityLabel(capability)}</strong></div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {pattern && (
         <section className="intelligence-section">
           <div className="section-title-text">
-            <span className="eyebrow">SOLUTION PATTERN</span>
             <h2>Conceptual capability map</h2>
             <p>This is a pattern, not an observed deployment and not a guarantee of compatibility.</p>
           </div>
@@ -176,10 +180,11 @@ export default function UseCaseIntelligenceDetail() {
         </section>
       )}
 
+          </>) },
+          { id: "technology", label: "Technologies & implementers", count: relatedProducts.length, content: (<>
       <section className="intelligence-section">
         <div className="section-title-text">
-          <span className="eyebrow">TECHNOLOGY CAPABILITY MAP</span>
-          <h2>Products that appear in related patterns and Blueprints</h2>
+          <h2>Technologies in related patterns and Blueprints</h2>
         </div>
         <div className="grid three">
           {relatedProducts.slice(0, 6).map((product) => (
@@ -191,7 +196,6 @@ export default function UseCaseIntelligenceDetail() {
       {!!implementers.length && (
         <section className="intelligence-section">
           <div className="section-title-text">
-            <span className="eyebrow">IMPLEMENTERS</span>
             <h2>People with published records for this outcome</h2>
           </div>
           <div className="grid three">
@@ -205,10 +209,13 @@ export default function UseCaseIntelligenceDetail() {
         </section>
       )}
 
+          </>) },
+        ]}
+      />
+
       <div className="implementation-request-banner">
         <div>
           <Workflow size={25} />
-          <span className="eyebrow">FROM OUTCOME TO REQUIREMENT</span>
           <h2>Describe your context before choosing the technology.</h2>
           <p>The Solution Compiler makes business constraints explicit and shows multiple feasible directions.</p>
         </div>

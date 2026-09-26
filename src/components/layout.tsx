@@ -42,20 +42,24 @@ const ProviderContactModal = lazy(() =>
 );
 import { isSupabase } from "../data/repository";
 
-const mainLinks = [
+type NavItem = readonly [string, string, typeof Home];
+const primaryLinks: readonly NavItem[] = [
   ["/", "Home", Home],
-  ["/explore", "Explore", Search],
+  ["/solution-compiler", "Find a solution", Sparkles],
   ["/implementations", "Implementations", LayoutGrid],
   ["/blueprints", "Blueprints", Layers3],
-  ["/use-cases", "Use Cases", GitBranch],
   ["/technologies", "Technologies", Cpu],
-  ["/providers", "Providers", Building2],
   ["/implementers", "Implementers", Users],
+];
+const browseLinks: readonly NavItem[] = [
+  ["/use-cases", "Use Cases", GitBranch],
+  ["/providers", "Providers", Building2],
   ["/builds", "Builds", LayoutGrid],
   ["/marketplace", "Marketplace", ShoppingBag],
   ["/resources", "Resources", BookOpen],
-] as const;
-const buyerLinks = [
+  ["/explore", "Explore", Search],
+];
+const buyerLinks: readonly NavItem[] = [
   ["/app/saved", "Saved", Bookmark],
   ["/collections", "Collections", Folder],
   ["/app/requirements", "Requirements", GitBranch],
@@ -63,7 +67,7 @@ const buyerLinks = [
   ["/app/projects", "My Projects", Folder],
   ["/app/messages", "Messages", MessageSquare],
   ["/compare", "Compare", Scale],
-] as const;
+];
 const providerSections = [
   "Overview",
   "Company",
@@ -170,32 +174,14 @@ export function AppSidebar({ close }: { close: () => void }) {
           </>
         ) : (
           <>
-            {mainLinks.map(([to, label, Icon]) => (
-              <NavLink
-                end
-                key={label}
-                to={to}
-                onClick={close}
-                className={({ isActive }) =>
-                  isActive &&
-                  (to.includes("?")
-                    ? location.search === to.slice(to.indexOf("?"))
-                    : true)
-                    ? "active"
-                    : ""
-                }
-              >
+            {primaryLinks.map(([to, label, Icon]) => (
+              <NavLink end key={label} to={to} onClick={close}>
                 <Icon size={19} strokeWidth={1.65} />
                 {label}
               </NavLink>
             ))}
-            <div className="nav-divider" />
-            {buyerLinks.map(([to, label, Icon]) => (
-              <NavLink key={label} to={to} onClick={close}>
-                <Icon size={19} strokeWidth={1.65} />
-                {label}
-              </NavLink>
-            ))}
+            <NavGroup title="Browse more" links={browseLinks} close={close} />
+            <NavGroup title="Your workspace" links={buyerLinks} close={close} />
           </>
         )}
       </nav>
@@ -216,15 +202,6 @@ export function AppSidebar({ close }: { close: () => void }) {
           <HelpCircle size={19} />
           Help & Support
         </NavLink>
-        <Link className="sidebar-promo" to="/solution-compiler" onClick={close}>
-          <strong>
-            Start with the
-            <br />
-            business outcome
-          </strong>
-          <p>Structure the problem, compare evidence, then choose the technology.</p>
-          <ArrowRight size={20} />
-        </Link>
         <div className="workspace-links">
           <Link to="/creator">Creator</Link>
           <Link to="/provider">Provider</Link>
@@ -238,6 +215,25 @@ export function AppSidebar({ close }: { close: () => void }) {
   );
 }
 
+function NavGroup({ title, links, close }: { title: string; links: readonly NavItem[]; close: () => void }) {
+  const location = useLocation();
+  const containsCurrent = links.some(([to]) => location.pathname === to || location.pathname.startsWith(to + "/"));
+  return (
+    <details className="nav-group" open={containsCurrent || undefined}>
+      <summary>
+        {title}
+        <ChevronDown size={14} aria-hidden />
+      </summary>
+      {links.map(([to, label, Icon]) => (
+        <NavLink key={label} to={to} onClick={close}>
+          <Icon size={17} strokeWidth={1.65} />
+          {label}
+        </NavLink>
+      ))}
+    </details>
+  );
+}
+
 export function MobileNavigation({ onMenu }: { onMenu: () => void }) {
   return (
     <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -247,11 +243,11 @@ export function MobileNavigation({ onMenu }: { onMenu: () => void }) {
       </NavLink>
       <NavLink to="/implementations">
         <LayoutGrid size={21} />
-        Evidence
+        Records
       </NavLink>
       <NavLink to="/solution-compiler" className="mobile-publish">
         <Sparkles size={21} />
-        Compile
+        Find
       </NavLink>
       <NavLink to="/app/saved">
         <Bookmark size={21} />
@@ -449,6 +445,11 @@ export function Layout() {
         <AppSidebar close={() => {}} />
       </aside>
       <div className="app-shell">
+        {!isSupabase && (
+          <p className="demo-strip" role="note">
+            <strong>Demo</strong> Every record, Blueprint, implementer and outcome here is illustrative — none describes a real customer or result.
+          </p>
+        )}
         <header className="topbar">
           <button
             className="icon-button mobile-menu-button"

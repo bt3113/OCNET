@@ -19,3 +19,19 @@ The architecture explorer uses a bounded scroll/pan canvas on desktop and an ord
 ## Implementation intelligence surfaces
 
 Same tokens and primitives; no second design system. Additions: evidence, freshness, rights and relationship badges (icon + text, never colour alone; demo-derived levels use a dashed border and “· demo”); an ILLUSTRATIVE notice; a `Drawer` primitive (Radix dialog as a right sheet on desktop, bottom sheet ≤700px) for provenance, claims, explanations, traces and mobile filters; requirement cards with INFERRED chips and Hard/Soft/Info segmented controls; candidate cards with component selectors, raw objective grids and supported trade-off labels; an SVG architecture map (solid = observed implementation, dashed = reference Blueprint slot, dashed amber edges = trust boundary) with zoom/pan/fit buttons, keyboard selection and a list view; comparison and trade-off tables that become labelled cards on mobile; PUBLIC / PRIVATE field tags in the contributor wizard. Motion is limited to drawers; `prefers-reduced-motion` disables it.
+
+## Information architecture (progressive disclosure)
+
+Patterns follow common solution-library and case-study layouts: summary first, detail on demand.
+
+- **Navigation:** six primary destinations (Home, Find a solution, Implementations, Blueprints, Technologies, Implementers). “Browse more” and “Your workspace” are collapsible groups that open automatically when they contain the current page.
+- **Demo labelling:** one persistent demo strip at the top of every page, plus a single “Illustrative” status chip per card. Cards no longer repeat several demo badges.
+- **Cards:** context eyebrow (business · locations · region), title, summary, up to two observed results, then a footer with evidence status and cost. Freshness appears only when it is not current.
+- **Detail pages:** hero with key facts and a single action panel, headline results (implementation records), then tabs (`TabbedSections` in `ui.tsx`) following the WAI-ARIA tabs pattern with arrow/Home/End keys. The active tab is stored as `?tab=`; legacy `#request`/`#evidence` anchors map to their tab.
+  - Implementation record: Overview · Architecture · Results & cost · Evidence · Similar & next steps
+  - Blueprint: Architecture (with version history and manifests) · Setup · Rights & trust · Related records
+  - Use case: Implementations · Blueprints · What it needs · Technologies & implementers
+- **Filters:** five primary filters are always visible; the rest sit under “More filters”, which opens automatically when one of them is active.
+- **Solution Compiler:** a three-step stepper. After compiling, the requirement form collapses into a summary with “Edit requirement”; results lead with the feasible approaches, then trade-offs, exclusions and comparable businesses. The engine’s step log sits under “How this result was computed”.
+
+Styles for these patterns live in `src/structure.css`.
