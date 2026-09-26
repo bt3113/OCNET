@@ -147,7 +147,7 @@ test("a Build can join a Use Case first listed by xAI", async ({ page }) => {
   await page.getByLabel("Short outcome / tagline").fill("Answers staff questions from the internal wiki.");
   await page.getByLabel("Description", { exact: true }).fill("An assistant connected to the company wiki and ticketing system that drafts answers for staff to review.");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.locator(".use-case-chip").first()).toContainText("Build custom assistants connected to internal systems");
+  await expect(page.locator(".use-case-chip").first()).toContainText("Build internal tools with the API");
   await finishAndPublish(page);
   await page.goto(`${base}/use-cases/internal-ai-assistants`);
   await expect(page.locator(".use-case-facts")).toContainText("Builds1");

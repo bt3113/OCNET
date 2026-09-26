@@ -9,18 +9,15 @@ import { normalizeLabel } from "./use-case-text.ts";
  * UseCaseSource — never as a Build. Builds are complete solutions published by
  * Solution Providers; none exists here.
  *
- * SOURCED, NOT DEMO: product descriptions and use-case statements are summarised from
- * xAI's public pages (principally https://x.ai/grok/use-cases, plus the API docs
- * linked below), read on SOURCED_AT. The profile is UNCLAIMED — xAI has not
- * reviewed or approved it. Nothing here is an Oracnet test result, a customer
- * deployment or an outcome claim, and no pricing, regions or compatibility are
- * asserted beyond what the sources state.
+ * SOURCED, NOT DEMO: the use-case catalogue below was checked against the live
+ * xAI use-case index and the linked official detail pages on SOURCED_AT. The
+ * profile remains UNCLAIMED — source verification is not vendor endorsement.
  */
 export const XAI_PROVIDER_ID = "xai";
 export const XAI_USE_CASES_URL = "https://x.ai/grok/use-cases";
 const SOURCED_AT = "2026-09-26";
 const sourced = "third-party sourced" as const;
-const attributeSource = `Summarised from xAI's public pages on ${SOURCED_AT}; not confirmed by xAI.`;
+const attributeSource = `Summarised from xAI's public pages and checked on ${SOURCED_AT}; not confirmed or maintained by xAI.`;
 
 export const xaiProvider: Provider = {
   id: XAI_PROVIDER_ID,
@@ -40,8 +37,8 @@ export const xaiProvider: Provider = {
     sourcedAt: SOURCED_AT,
     tagline: "AI solutions for every workflow",
     about:
-      "xAI builds the Grok family of models and products. Its public use-case page describes the work Grok can be used for; Oracnet records each statement as a vendor-stated Use Case and links back to the page.",
-    note: "xAI's website currently brands its pages as “SpaceXAI”.",
+      "xAI builds the Grok family of models and products. Its public use-case page describes work Grok can be used for; Oracnet records each statement as a vendor-stated Use Case and links to the official detail page.",
+    note: "This profile is compiled from public xAI pages. xAI has not claimed, reviewed or endorsed the Oracnet profile.",
     sources: [
       { label: "Grok use cases", url: XAI_USE_CASES_URL },
       { label: "Grok API overview", url: "https://docs.x.ai/overview" },
@@ -63,7 +60,7 @@ const productRows: [
   ["grok-api", "Grok API", "Text, code, voice, image and video models through one API", ["language", "document-extraction", "translation", "content-generation"], "developer", "https://docs.x.ai/overview"],
   ["grok-voice", "Grok Voice Agent API", "Realtime speech-to-speech voice agents with tool use; text-to-speech and speech-to-text", ["voice"], "developer", "https://docs.x.ai/docs/guides/voice"],
   ["grok-imagine", "Grok Imagine API", "Image and video generation from text or image references", ["image-generation", "video"], "developer", "https://x.ai/api/imagine"],
-  ["grok-build", "Grok Build", "Agentic coding on the API and CLI: plan, refactor, debug and build", ["coding-agent"], "developer", XAI_USE_CASES_URL],
+  ["grok-build", "Grok Build", "Agentic coding on the API and CLI: plan, refactor, debug and build", ["coding-agent"], "developer", "https://x.ai/grok/use-cases/code-planning"],
 ];
 
 export const xaiProducts: Product[] = productRows.map(([id, name, description, capabilityIds, operatorSkill, sourceUrl]) => ({
@@ -92,32 +89,194 @@ type VendorStatement = {
   definition: string;
   categoryId: string;
   subcategoryId: string;
-  /** xAI's wording as captured. */
+  /** xAI's short wording as displayed on its use-case index. */
   statement: string;
   productIds: string[];
-  /** Earlier Oracnet listing name (kept as an alternate search label). */
-  formerLabel: string;
-  legacyBuildSlug: string;
-  docUrl?: string;
+  sourceUrl: string;
+  /** Earlier Oracnet labels kept as alternate search labels. */
+  aliases?: string[];
+  /** Earlier releases exposed some statements as /builds/xai-* pages. */
+  legacyBuildSlug?: string;
 };
 
 /**
- * Captured from search-index copies of x.ai/grok/use-cases (the page itself was not
- * reachable from the build environment). Titles are Oracnet's normalised labels; the
- * `statement` is xAI's wording as captured and must be checked against the live page.
+ * Verified against https://x.ai/grok/use-cases and the official detail pages on
+ * SOURCED_AT. Public titles are the vendor's live titles. Category/subcategory and
+ * the concise `definition` are Oracnet editorial structure, kept separate from the
+ * captured source statement.
  */
 const statements: VendorStatement[] = [
-  { id: "handle-customer-inquiries-with-voice-agents", title: "Handle customer inquiries with voice agents", definition: "Answer and route inbound customer calls with a voice agent, with people handling exceptions.", categoryId: "customer-service", subcategoryId: "cs-voice", statement: "Deploy voice AI to handle customer inquiries, route calls, and reduce wait times.", productIds: ["grok-voice"], formerLabel: "Voice agents for customer support", legacyBuildSlug: "xai-voice-customer-support", docUrl: "https://docs.x.ai/docs/guides/voice" },
-  { id: "plan-and-implement-code-changes", title: "Plan and implement code changes", definition: "Plan a code change, then implement it across files with engineers reviewing the result.", categoryId: "software-development", subcategoryId: "sd-coding", statement: "Use plan mode to architect changes, then implement across files with Grok Build.", productIds: ["grok-build"], formerLabel: "Plan and implement code changes", legacyBuildSlug: "xai-plan-and-implement-code" },
-  { id: "trace-errors-to-their-root-cause", title: "Trace errors to their root cause", definition: "Investigate an error across logs, code and stack traces to find what caused it.", categoryId: "software-development", subcategoryId: "sd-debugging", statement: "Trace errors across logs, code, and stack traces to find root causes in minutes.", productIds: ["grok-build"], formerLabel: "Trace errors to their root cause", legacyBuildSlug: "xai-trace-errors-root-cause" },
-  { id: "generate-technical-documentation", title: "Generate technical documentation from a codebase", definition: "Produce architecture docs, API references and runbooks from existing code.", categoryId: "software-development", subcategoryId: "sd-documentation", statement: "Generate architecture docs, API references, and runbooks from your codebase.", productIds: ["grok-build", "grok-api"], formerLabel: "Generate technical documentation", legacyBuildSlug: "xai-generate-technical-docs" },
-  { id: "draft-long-form-content", title: "Draft long-form articles, reports and proposals", definition: "Outline and draft long documents, then refine them with editors.", categoryId: "marketing", subcategoryId: "mk-content", statement: "Write blog posts, reports, and proposals with structured outlines and iterative refinement.", productIds: ["grok"], formerLabel: "Long-form writing and reports", legacyBuildSlug: "xai-long-form-writing" },
-  { id: "write-campaign-copy-in-brand-voice", title: "Write campaign copy in a brand voice", definition: "Draft ad copy, email sequences and social posts that follow brand guidelines.", categoryId: "marketing", subcategoryId: "mk-campaigns", statement: "Generate ad copy, email sequences, and social posts that match your brand voice.", productIds: ["grok-api"], formerLabel: "Campaign copy in your brand voice", legacyBuildSlug: "xai-brand-voice-copy" },
-  { id: "translation-localization", title: "Translate and localize content", definition: "Adapt product, support and marketing content for new markets, with human review.", categoryId: "marketing", subcategoryId: "mk-localization", statement: "Adapt content for different markets with nuanced, context-aware translation.", productIds: ["grok-api"], formerLabel: "Translation and localization", legacyBuildSlug: "xai-translation-localization" },
-  { id: "document-data-extraction", title: "Extract structured data from documents", definition: "Turn contracts, invoices and forms into structured records, with exceptions routed to a person.", categoryId: "operations", subcategoryId: "ops-documents", statement: "Parse contracts, invoices, and forms to extract structured data at scale.", productIds: ["grok-api"], formerLabel: "Document processing", legacyBuildSlug: "xai-document-processing" },
-  { id: "create-product-mockups-and-concept-art", title: "Create product mockups and concept art", definition: "Generate and iterate on product mockups, illustrations and concept art.", categoryId: "marketing", subcategoryId: "mk-visual", statement: "Create product mockups, illustrations, and concept art with the Imagine API. Transform photos, apply style transfers, and iterate on visual concepts.", productIds: ["grok-imagine"], formerLabel: "Product mockups and concept art", legacyBuildSlug: "xai-imagine-visual-concepts", docUrl: "https://x.ai/api/imagine" },
-  { id: "generate-video-clips-with-audio", title: "Generate short video clips with synchronized audio", definition: "Produce short video clips with audio for social posts, ads and presentations.", categoryId: "marketing", subcategoryId: "mk-visual", statement: "Generate video clips with synchronized audio for social, ads, and presentations.", productIds: ["grok-imagine"], formerLabel: "Video clips with synchronized audio", legacyBuildSlug: "xai-imagine-video-clips", docUrl: "https://x.ai/api/imagine" },
-  { id: "internal-ai-assistants", title: "Build custom assistants connected to internal systems", definition: "Connect a model to your own tools and data to answer questions and run approved automations.", categoryId: "operations", subcategoryId: "ops-internal-tools", statement: "Connect Grok to your internal systems to build custom assistants and automations.", productIds: ["grok-api"], formerLabel: "Custom assistants and automations", legacyBuildSlug: "xai-custom-integrations" },
+  {
+    id: "synthesize-research-across-sources",
+    title: "Synthesize research across sources",
+    definition: "Combine findings from multiple sources into a structured research synthesis with citations.",
+    categoryId: "data-analytics",
+    subcategoryId: "an-research",
+    statement: "Pull together findings from papers, reports, and datasets into structured summaries with citations.",
+    productIds: ["grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/research-synthesis",
+  },
+  {
+    id: "monitor-news-and-market-signals",
+    title: "Monitor news and market signals",
+    definition: "Track changing news and market signals and surface relevant developments for review.",
+    categoryId: "data-analytics",
+    subcategoryId: "an-market-intelligence",
+    statement: "Track developments in real time across the web and X to stay ahead of fast-moving topics.",
+    productIds: ["grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/market-monitoring",
+  },
+  {
+    id: "analyze-financial-data-and-filings",
+    title: "Analyze financial data and filings",
+    definition: "Analyze filings, reports and financial models to extract figures and identify material signals.",
+    categoryId: "finance",
+    subcategoryId: "fin-analysis",
+    statement: "Process earnings reports, SEC filings, and financial models to surface key insights quickly.",
+    productIds: ["grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/financial-analysis",
+  },
+  {
+    id: "plan-and-implement-code-changes",
+    title: "Plan and implement code changes",
+    definition: "Plan a code change, then implement it across files with engineers reviewing the result.",
+    categoryId: "software-development",
+    subcategoryId: "sd-coding",
+    statement: "Use plan mode to architect changes, then implement across files with Grok Build.",
+    productIds: ["grok-build", "grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/code-planning",
+    legacyBuildSlug: "xai-plan-and-implement-code",
+  },
+  {
+    id: "trace-errors-to-their-root-cause",
+    title: "Debug production issues faster",
+    definition: "Investigate production errors across logs, code and stack traces to find likely root causes.",
+    categoryId: "software-development",
+    subcategoryId: "sd-debugging",
+    statement: "Trace errors across logs, code, and stack traces to find root causes in minutes.",
+    productIds: ["grok-build", "grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/debugging",
+    aliases: ["Trace errors to their root cause"],
+    legacyBuildSlug: "xai-trace-errors-root-cause",
+  },
+  {
+    id: "generate-technical-documentation",
+    title: "Write and review technical docs",
+    definition: "Create and review architecture documentation, API references and operational runbooks from a codebase.",
+    categoryId: "software-development",
+    subcategoryId: "sd-documentation",
+    statement: "Generate architecture docs, API references, and runbooks from your codebase.",
+    productIds: ["grok-build", "grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/technical-docs",
+    aliases: ["Generate technical documentation", "Generate technical documentation from a codebase"],
+    legacyBuildSlug: "xai-generate-technical-docs",
+  },
+  {
+    id: "draft-long-form-content",
+    title: "Draft and iterate on long-form content",
+    definition: "Outline, draft and refine long-form business or editorial content with human review.",
+    categoryId: "marketing",
+    subcategoryId: "mk-content",
+    statement: "Write blog posts, reports, and proposals with structured outlines and iterative refinement.",
+    productIds: ["grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/long-form-writing",
+    aliases: ["Long-form writing and reports", "Draft long-form articles, reports and proposals"],
+    legacyBuildSlug: "xai-long-form-writing",
+  },
+  {
+    id: "write-campaign-copy-in-brand-voice",
+    title: "Create marketing copy across channels",
+    definition: "Draft marketing copy for ads, email and social channels while following brand guidance.",
+    categoryId: "marketing",
+    subcategoryId: "mk-campaigns",
+    statement: "Generate ad copy, email sequences, and social posts that match your brand voice.",
+    productIds: ["grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/marketing-copy",
+    aliases: ["Campaign copy in your brand voice", "Write campaign copy in a brand voice"],
+    legacyBuildSlug: "xai-brand-voice-copy",
+  },
+  {
+    id: "translation-localization",
+    title: "Translate and localize content",
+    definition: "Adapt product, support and marketing content for other languages and markets, with human review.",
+    categoryId: "marketing",
+    subcategoryId: "mk-localization",
+    statement: "Adapt content for different markets with nuanced, context-aware translation.",
+    productIds: ["grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/translation",
+    aliases: ["Translation and localization"],
+    legacyBuildSlug: "xai-translation-localization",
+  },
+  {
+    id: "handle-customer-inquiries-with-voice-agents",
+    title: "Automate workflows with voice agents",
+    definition: "Use voice agents to handle inbound customer conversations, routing and workflow actions with human exceptions.",
+    categoryId: "customer-service",
+    subcategoryId: "cs-voice",
+    statement: "Deploy voice AI to handle customer inquiries, route calls, and reduce wait times.",
+    productIds: ["grok-voice", "grok-api"],
+    sourceUrl: "https://x.ai/grok/use-cases/voice-agents",
+    aliases: ["Voice agents for customer support", "Handle customer inquiries with voice agents"],
+    legacyBuildSlug: "xai-voice-customer-support",
+  },
+  {
+    id: "document-data-extraction",
+    title: "Process and extract from documents",
+    definition: "Extract structured records from contracts, invoices and forms, routing exceptions for review.",
+    categoryId: "operations",
+    subcategoryId: "ops-documents",
+    statement: "Parse contracts, invoices, and forms to extract structured data at scale.",
+    productIds: ["grok-api"],
+    sourceUrl: "https://x.ai/grok/use-cases/document-processing",
+    aliases: ["Document processing", "Extract structured data from documents"],
+    legacyBuildSlug: "xai-document-processing",
+  },
+  {
+    id: "internal-ai-assistants",
+    title: "Build internal tools with the API",
+    definition: "Connect a model API to internal systems to create assistants and approved automations.",
+    categoryId: "operations",
+    subcategoryId: "ops-internal-tools",
+    statement: "Connect Grok to your internal systems to build custom assistants and automations.",
+    productIds: ["grok-api"],
+    sourceUrl: "https://x.ai/grok/use-cases/internal-tools",
+    aliases: ["Custom assistants and automations", "Build custom assistants connected to internal systems"],
+    legacyBuildSlug: "xai-custom-integrations",
+  },
+  {
+    id: "create-product-mockups-and-concept-art",
+    title: "Generate images from descriptions",
+    definition: "Generate visual concepts, mockups and illustrations from text descriptions and iterate on them.",
+    categoryId: "marketing",
+    subcategoryId: "mk-visual",
+    statement: "Create product mockups, illustrations, and concept art with the Imagine API.",
+    productIds: ["grok-imagine", "grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/image-generation",
+    aliases: ["Product mockups and concept art", "Create product mockups and concept art"],
+    legacyBuildSlug: "xai-imagine-visual-concepts",
+  },
+  {
+    id: "edit-and-restyle-existing-images",
+    title: "Edit and restyle existing images",
+    definition: "Transform or restyle existing images and iterate on visual concepts.",
+    categoryId: "marketing",
+    subcategoryId: "mk-visual",
+    statement: "Transform photos, apply style transfers, and iterate on visual concepts.",
+    productIds: ["grok-imagine", "grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/image-editing",
+  },
+  {
+    id: "generate-video-clips-with-audio",
+    title: "Create short videos from prompts",
+    definition: "Generate short video clips from prompts for marketing, social and presentation use.",
+    categoryId: "marketing",
+    subcategoryId: "mk-visual",
+    statement: "Generate video clips with synchronized audio for social, ads, and presentations.",
+    productIds: ["grok-imagine", "grok"],
+    sourceUrl: "https://x.ai/grok/use-cases/video-generation",
+    aliases: ["Video clips with synchronized audio", "Generate short video clips with synchronized audio"],
+    legacyBuildSlug: "xai-imagine-video-clips",
+  },
 ];
 
 export const xaiUseCases: UseCase[] = statements.map((item) => ({
@@ -137,7 +296,7 @@ export const xaiUseCases: UseCase[] = statements.map((item) => ({
   originEntityId: XAI_PROVIDER_ID,
   createdBy: "oracnet-catalogue",
   createdAt: `${SOURCED_AT}T09:00:00Z`,
-  updatedAt: `${SOURCED_AT}T09:00:00Z`,
+  updatedAt: `${SOURCED_AT}T16:20:00Z`,
   provenance: sourced,
 }));
 
@@ -147,34 +306,37 @@ export const xaiUseCaseSources: UseCaseSource[] = statements.map((item) => ({
   useCaseId: item.id,
   sourceType: "technology-vendor",
   sourceEntityId: XAI_PROVIDER_ID,
+  originalTitle: item.title,
   originalDescription: item.statement,
   productIds: item.productIds,
-  sourceUrl: XAI_USE_CASES_URL,
+  sourceUrl: item.sourceUrl,
   retrievedAt: SOURCED_AT,
   lastCheckedAt: SOURCED_AT,
-  captureMethod: "Search-index copy of the page; verify wording against the live page.",
-  attribution: "© xAI. Quoted from its public use-case page for attribution.",
-  status: "needs-verification",
+  captureMethod: "Verified against the live xAI use-case index and linked official detail page on 2026-09-26.",
+  attribution: "© xAI. Short vendor wording reproduced for source attribution.",
+  status: "active",
   provenance: sourced,
 }));
 
-export const xaiUseCaseAliases: UseCaseAlias[] = statements
-  .filter((item) => normalizeLabel(item.formerLabel) !== normalizeLabel(item.title))
-  .map((item) => ({
-    id: `xai-alias-${item.id}`,
-    name: item.formerLabel,
-    useCaseId: item.id,
-    label: item.formerLabel,
-    aliasType: "alternate",
-    normalizedLabel: normalizeLabel(item.formerLabel),
-    language: "en",
-    source: "Earlier Oracnet listing label",
-    provenance: sourced,
-  }));
+export const xaiUseCaseAliases: UseCaseAlias[] = statements.flatMap((item) =>
+  [...new Set(item.aliases ?? [])]
+    .filter((label) => normalizeLabel(label) !== normalizeLabel(item.title))
+    .map((label, index) => ({
+      id: `xai-alias-${item.id}-${index}`,
+      name: label,
+      useCaseId: item.id,
+      label,
+      aliasType: "alternate" as const,
+      normalizedLabel: normalizeLabel(label),
+      language: "en",
+      source: "Earlier Oracnet label",
+      provenance: sourced,
+    })),
+);
 
-/** Earlier releases published these statements as /builds/xai-* pages. */
+/** Earlier releases published eleven vendor statements as /builds/xai-* pages. */
 export const xaiLegacyBuildRedirects: Record<string, string> = Object.fromEntries(
-  statements.map((item) => [item.legacyBuildSlug, item.id]),
+  statements.filter((item) => item.legacyBuildSlug).map((item) => [item.legacyBuildSlug!, item.id]),
 );
 
 /** Broad areas that earlier releases listed as Use Cases now point at the taxonomy. */

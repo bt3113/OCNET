@@ -18,14 +18,30 @@ export interface Repository {
 const key = "oracnet:v1:";
 /** Intelligence tables use their own namespace so seed revisions do not mix with older browser data. */
 const intelligenceKey = "oracnet:intel-v4:";
-/** The work taxonomy moved Use Cases under Category → Subcategory; older stored copies are not reused. */
-const taxonomyKey = "oracnet:taxonomy-v1:";
-const taxonomyTables = new Set<Table>(["use_cases", "use_case_categories", "use_case_sources", "use_case_aliases", "use_case_proposals", "use_case_redirects"]);
-const storageKey = (table: Table) => (taxonomyTables.has(table) ? taxonomyKey : table in intelligenceSeed ? intelligenceKey : key) + table;
+/**
+ * Taxonomy catalogue v2 refreshes source-controlled Use Cases after live vendor
+ * verification. Provider-created proposal drafts deliberately stay on v1 so a
+ * catalogue refresh does not discard user work.
+ */
+const taxonomyCatalogKey = "oracnet:taxonomy-v2:";
+const taxonomyProposalKey = "oracnet:taxonomy-v1:";
+const taxonomyCatalogTables = new Set<Table>(["use_cases", "use_case_categories", "use_case_sources", "use_case_aliases", "use_case_redirects"]);
+const storageKey = (table: Table) =>
+  (taxonomyCatalogTables.has(table)
+    ? taxonomyCatalogKey
+    : table === "use_case_proposals"
+      ? taxonomyProposalKey
+      : table in intelligenceSeed
+        ? intelligenceKey
+        : key) + table;
 /** Earlier releases stored xAI's vendor statements as Builds and a creator profile; they are now Use Cases. */
 const retiredRecord = (table: Table, row: { id: string; provenance?: string }) =>
   (table === "builds" && row.id.startsWith("xai-") && row.provenance === "third-party sourced") ||
   (table === "creator_profiles" && row.id === "xai" && row.provenance === "third-party sourced");
+/** Public vendor catalogue rows are source-controlled in demo mode, not user-owned. */
+const sourcedVendorRecord = (table: Table, row: { id: string; provenance?: string }) =>
+  row.provenance === "third-party sourced" &&
+  ((table === "providers" && row.id === xaiProvider.id) || (table === "products" && xaiProducts.some((product) => product.id === row.id)));
 export class DemoRepository implements Repository {
   private read<K extends Table>(table: K): Tables[K][] {
     const raw = localStorage.getItem(storageKey(table));
@@ -34,7 +50,7 @@ export class DemoRepository implements Repository {
     try {
       const parsed: unknown = JSON.parse(raw);
       if (!Array.isArray(parsed)) throw Error();
-      // Catalogue entries added after a visitor's data was first stored.
+      // Catalogue entries added or source-verified after a visitor's data was first stored.
       const additions: Partial<Record<Table, { id: string }[]>> = {
         products: [...buildProducts, ...intelligenceProducts, ...xaiProducts],
         providers: [...buildProviders, ...intelligenceProviders, xaiProvider],
@@ -43,7 +59,9 @@ export class DemoRepository implements Repository {
         creator_profiles: marketplaceCreators,
         build_offers: marketplaceOffers,
       };
-      const current = (parsed as { id: string; provenance?: string }[]).filter((row) => !retiredRecord(table, row));
+      const current = (parsed as { id: string; provenance?: string }[]).filter(
+        (row) => !retiredRecord(table, row) && !sourcedVendorRecord(table, row),
+      );
       return [
         ...current,
         ...(additions[table] ?? []).filter((x) => !current.some((v) => v.id === x.id)),
